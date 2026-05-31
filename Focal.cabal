@@ -1,0 +1,74 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.39.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           Focal
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme>
+homepage:       https://github.com/ytfh44/Focal#readme
+bug-reports:    https://github.com/ytfh44/Focal/issues
+author:         Yesod Yin
+maintainer:     ytfh44@gmail.com
+copyright:      2026 Yesod Yin
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/ytfh44/Focal
+
+library
+  exposed-modules:
+      Focal.Core
+      Focal.Tuple
+      Focal.List
+      Focal.Zipper
+  other-modules:
+      Lib
+      Paths_Focal
+  autogen-modules:
+      Paths_Focal
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable Focal-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_Focal
+  autogen-modules:
+      Paths_Focal
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Focal
+    , base >=4.7 && <5
+  default-language: Haskell2010
+
+test-suite Focal-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_Focal
+  autogen-modules:
+      Paths_Focal
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Focal
+    , QuickCheck
+    , base >=4.7 && <5
+    , tasty
+    , tasty-quickcheck
+  default-language: Haskell2010

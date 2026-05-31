@@ -1,0 +1,38 @@
+# Stack build artifacts
+.stack-work/
+
+# Cabal build artifacts
+dist/
+dist-newstyle/
+.cabal-sandbox/
+cabal.sandbox.config
+
+# Haskell compiled files
+*.hi
+*.o
+*.dyn_o
+*.dyn_hi
+
+# Haddock documentation
+dist/doc/
+
+# HPC test coverage
+*.tix
+*.mix
+.hpc/
+
+# Editor backup files
+*~
+*.swp
+*.swo
+*#
+.#*
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,67 @@
+name:                Focal
+version:             0.1.0.0
+github:              "ytfh44/Focal"
+license:             BSD-3-Clause
+author:              "Yesod Yin"
+maintainer:          "ytfh44@gmail.com"
+copyright:           "2026 Yesod Yin"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Focal.Core
+  - Focal.Tuple
+  - Focal.List
+  - Focal.Zipper
+
+executables:
+  Focal-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - Focal
+
+tests:
+  Focal-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - Focal
+    - tasty
+    - tasty-quickcheck
+    - QuickCheck
