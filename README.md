@@ -103,6 +103,56 @@ Serves as the unit of composition (`>>>`). Used in law tests to verify associati
 
 ---
 
+## Axiomatic foundation
+
+Focal is not just a data type — it's a **lawful explicit-residual focus** interface. The six core axioms below are not arbitrary syntactic requirements; they are reverse-engineered from the uses Focal is designed to support: Zipper, Lens-like optic, Redex context, Refactoring, Persistence view-update, and beyond.
+
+### Central principle
+
+> The residual context `c` must be concrete enough to rebuild, navigate, and interpret local edits — but restricted enough that it does not absorb application semantics and effects.
+
+### Core axioms
+
+| # | Axiom | Status in library | Test coverage |
+|---|---|---|---|
+| **A1** | **Split—Plug Reconstruction**: `let (a, c) = splitF f s in plugF f c a == s` | Enforced structurally | 8 properties — `idF`, `fstF`, `sndF`, list, Rose, BinTree, `pureF`, composed |
+| **A2** | **Residual Legality**: `c` derives from a legitimate `splitF`, not an arbitrary forgeable value | `Focal` existential hides `c`; `Focusing` constructor exported (by design for inspection) | 3 properties — `idF`, list, Rose residuals tied to source |
+| **A3** | **Composition Associativity**: `(f >>> g) >>> h ≃ f >>> (g >>> h)` up to residual reassociation `((c1,c2),c3) ≃ (c1,(c2,c3))` | `>>>` nests residuals as pairs; behaviourally equivalent | 4 properties — `idF` chain, tuple chain, cross-module, plug law |
+| **A4** | **Identity Focus**: `idF >>> f ≃ f` and `f >>> idF ≃ f` | `idF` with `()` residual; law holds behaviourally | 6 properties — `fstF`, list element, zipper (left and right) |
+| **A5** | **Locality**: `plugF : c -> b -> t` — no Env, no IO, no global state | Type-enforced: no effects in signature | 1 property — `overFM` purity check |
+| **A6** | **Occurrence ≠ Value**: focus identity is `(a, c)`, not `a` alone; equal values at different positions yield different residuals | Residuals differ by position; type system tracks `c` | 3 properties — list (equal values at different indices), Rose, BinTree |
+
+### Extension axioms
+
+These extend the core for typed syntax, navigation, editing, sharing, and strategy. They are documented as the boundary between Focal's geometric guarantees and domain-specific semantics.
+
+| # | Axiom | Status |
+|---|---|---|
+| **XB** | **Path—Residual Consistency**: path view and residual view agree (`focusAt` / `pathOf` roundtrip) | 4 properties — `safeFocusAt`, `fromZip` roundtrip, multi-level navigation |
+| **XD** | **Edit Survival**: same-focus edits compose; nested edits decompose; independent foci commute (prefix-controlled fragment) | 3 properties — sequential `overF` composition, nested decomposition, independent-focus commutation |
+| **XA** | **Type Endpoints**: residual carries endpoint sorts; replacement preserves focus sort | Deferred — requires indexed GADTs |
+| **XC** | **Navigation Normalization**: arbitrary navigation normalizes to LCA + down only under tree-like and decidable-child assumptions | Implicit in `safeNavigate`; decidable-child not formalized |
+| **XE** | **Sharing Boundary**: occurrence focus ≠ vertex/entity focus for DAGs | Deferred — documented boundary in DAG section |
+| **XF** | **Strategy Externalization**: evaluation strategies live outside Focal core | By design — no strategy in `plugF` |
+| **XG** | **Computability Witness**: child selection requires decidable equality | Not yet exposed — `ZipTree` defaults to `Int` |
+
+### Coverage summary
+
+The test suite has **43 QuickCheck properties** organized by axiom:
+
+- **A1** (8) — Split/plug roundtrip for all shipped focusings
+- **A2** (3) — Residual validity tied to source
+- **A3** (4) — Composition associativity including cross-module
+- **A4** (6) — Identity: left and right for tuple, list, zipper
+- **A5** (1) — Locality: monadic bridge purity
+- **A6** (3) — Occurrence ≠ value: list, Rose, BinTree
+- **XB** (4) — Path—residual consistency: focusAt, fromZip, multi-level
+- **XD** (3) — Edit survival: composition, nesting, commutation
+- **Zipper** (4) — Descend/ascend and up/down roundtrips
+- **Concrete + Regression** (7) — Tuple, list, edge cases
+
+---
+
 ## The four degrees of freedom
 
 `Focusing c s t a b` is not a single interface — it is a **template** that specializes into distinct types depending on how four questions are answered. These four dimensions are independent, and their combinations generate the space of all useful specializations:
