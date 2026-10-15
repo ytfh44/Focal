@@ -19,10 +19,13 @@ this document and the code disagree, the code wins and this document is fixed.
   in `Either e` return values; laws are the success-premise variants (§3). The
   **success domain** of a `FocusingE` is the set of sources whose `splitE`
   returns `Right`; residuals are taken from successful splits.
+- **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
+  validation, logging, and state live in the monad `m`; `FocusingE` is the
+  `m = Either e` case, and a pure `Focusing` embeds by purity.
 
 | Level | Name | What it is | Enforced by | Violation consequence |
 |---|---|---|---|---|
-| **L0** | Structure definitions | `Focusing c s t a b` with `splitF :: s -> (a, c)`, `plugF :: c -> b -> t`; **type facts**: no `Env`/`IO`/state slot (locality), and the constructor is public, so forgery cannot be prevented at the type level; the failure-channel rung is `FocusingE e c s t a b` with `splitE :: s -> Either e (a, c)` and `plugE :: c -> b -> Either e t` (`Focal.Partial`) | The type system | Cannot be prevented (registered per instance in `conformance.md`) |
+| **L0** | Structure definitions | `Focusing c s t a b` with `splitF :: s -> (a, c)`, `plugF :: c -> b -> t`; **type facts**: no `Env`/`IO`/state slot (locality), and the constructor is public, so forgery cannot be prevented at the type level; the failure-channel rung is `FocusingE e c s t a b` with `splitE :: s -> Either e (a, c)` and `plugE :: c -> b -> Either e t` (`Focal.Partial`); the effectful rung is `FocusingM m c s t a b` with `splitM :: s -> m (a, c)` and `plugM :: c -> b -> m t` (`Focal.Effectful`) | The type system | Cannot be prevented (registered per instance in `conformance.md`) |
 | **L1** | Axiom | **A-LENS** (the only axiom): a lawful instance satisfies GP, PG, and PP on its declared domain (§2) | Assumption (assume–guarantee) + per-instance witness tests | Not in the lawful subclass; its behavior is protected by no law |
 | **L2** | Definitional identities | `idF` behavior (`splitF idF s == (s, ())`, `plugF idF () b == b`); the `composeF` plug law (true by unfolding) | Definition | None (no failure mode) |
 | **L3** | Corollaries | Occurrence ≠ value (corollary of GP); composition associativity and unit laws, modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | Derivation (§3) | None |
@@ -136,14 +139,14 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 11 of 85: `prop_lgp_*`, partial `prop_lgpE_*` |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 9 of 85: `prop_lpg_*`, partial `prop_lpgE_*` |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 7 of 85: `prop_lpp_*`, partial `prop_lppE_*` (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 85: `prop_lovf_*` (four instances plus the partial success-prefix case) |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 85: `prop_lassoc_*` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 85: `prop_lunit_*` |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 85: `prop_lnorm_*` |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 85: `prop_ltvl_*` |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 11 of 105: `prop_lgp_*`, partial `prop_lgpE_*`; effectful `prop_lgpM_*` |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 9 of 105: `prop_lpg_*`, partial `prop_lpgE_*`; effectful `prop_lpgM_*` |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 7 of 105: `prop_lpp_*`, partial `prop_lppE_*`; effectful per instance `prop_lppM_*` (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 105: `prop_lovf_*` (four instances plus the partial success-prefix case) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 105: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 105: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 105: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 105: `prop_ltvl_*` |
 | definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
@@ -163,6 +166,21 @@ including `Left`); **OVF** — if `overE f h s = Right t` then
 `overE f (g . h) s = overE f g t`. The unconditional forms are false (a failed
 write leaves no `c'`): pinned by `prop_discE_ppNeedsSuccess`,
 `prop_discE_uncondOVF`, and the wiring group `prop_scE_*`.
+
+**Effectful rung (`FocusingM`).** With both legs in a monad `m`, the clauses
+read as Kleisli equations: **GP** — `splitM f s >>= \ (a, c) -> plugM f c a
+= return s`; **PG** — for all continuations `k`,
+`plugM f c b >>= \ t -> splitM f t >>= \ (a', c') -> k t (a', c') a'` equals
+the same with the pair's observation `a'` replaced by `b` (the effects of the
+plug and of the re-split appear on both sides; the bare form demanding
+`return b` is false with effects — `prop_discM_barePg`); **PP** — the replay
+equation `plugM f c b1 >>= \ t -> splitM f t >>= \ (_, c') -> plugM f c' b2
+= plugM f c b2` is **not universal**: it fails for logging
+(`prop_discM_ppLog`) and for partial plugs without a success premise
+(`prop_discM_ppPartial`), and holds per instance (`prop_lppM_*`).
+**Composition closure:** GP and PG are preserved under 'composeM' for every
+monad — bind associativity plus the component laws, no commutativity needed —
+witnessed by `prop_compM_*` and an exhaustive small-universe sweep.
 
 ## 4. Contracts
 
@@ -184,7 +202,7 @@ Every throw site is registered below and in `conformance.md`:
 | `unsafeElementF`'s `splitF` | `n >= length xs` | delayed `error` |
 | `focusAt`'s `splitF` | path absent in the supplied tree (the construction tree is checked separately, returning `Nothing`) | delayed `error` |
 
-The registered `error` sites are kept unchanged; for new code the channel variant is the interface (`Focal.Partial`; `Focal.List.elementE` for the list focus).
+The registered `error` sites are kept unchanged; for new code the channel variant is the interface (`Focal.Partial`, `Focal.Effectful`; `Focal.List.elementE` for the list focus).
 
 ### 4.2 Input invariance
 
@@ -204,7 +222,7 @@ Claims that cannot be so mapped are defects, not documentation.
 
 ## 5. Representation ladder and caveats
 
-Equivalent readings of `Focusing` (items 1–4) and of `FocusingE` (item 5), each with its own premise:
+Equivalent readings of `Focusing` (items 1–4), `FocusingE` (item 5), and `FocusingM` (item 6), each with its own premise:
 
 1. **CPS closure.** Packing the residual as an existential is the CPS form:
    `∃C. P(C) ≅ ∀R. (∀C. P(C) → R) → R` — exposed as `mkFocal` / `withFocal`
@@ -229,6 +247,13 @@ Equivalent readings of `Focusing` (items 1–4) and of `FocusingE` (item 5), eac
    (item 4 applies unchanged). Rank: the `Focal.Partial` exports are rank ≤ 1;
    a nominal `FocalE` seal, if added, costs exactly one rank-2 eliminator
    (the item-1 sealing induction).
+6. **Effectful reading.** For any functor `m`, the `FocusingM` coend
+   `∫^C Hom(S, m(A×C)) × Hom(C, B→mT)` collapses unconditionally to
+   `Hom(S, m(A×(B→mT)))` (Yoneda reduction in the second variable; no
+   distributivity or commutativity premises) — the Store form is
+   `s -> m (a, b -> m t)` with canonical residual `b -> m t`. Residuals are
+   not recoverable and laws do not transport (item 4 applies unchanged).
+   Rank: every `Focal.Effectful` export is rank ≤ 1 (no new quantifiers).
 
 Caveats:
 

@@ -122,6 +122,21 @@ split outer→inner and plug inner→outer; the first `Left` short-circuits.
 `toPartial` embeds any pure `Focusing`; `toStoreE`/`fromStoreE` give the
 partial Store reading.
 
+### 6. Effectful rebuild (`Focal.Effectful`)
+
+```haskell
+data FocusingM m c s t a b = FocusingM
+  { splitM :: s -> m (a, c)
+  , plugM  :: c -> b -> m t
+  }
+```
+
+Both legs live in a monad `m`: failures (`m = Either e`), validation, logging
+(`m = Writer`), and stateful reconstruction (`m = State`). `FocusingE` is the
+`m = Either e` case (`toEffectfulE`); a pure `Focusing` embeds by purity
+(`toEffectful`). GP/PG hold as Kleisli equations and are preserved by
+`composeM` for every monad; PP is per instance (replay-sensitive).
+
 ---
 
 ## Law status
@@ -148,17 +163,17 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 | **L1** | Axiom **A-LENS** (GP ∧ PG ∧ PP) | Assumption per instance | L-GP / L-PG / L-PP families — see conformance |
 | **L2** | Definitional identities (`idF`; `composeF` plug law) | Definition | Definitional (no failure mode) |
 | **L3** | Corollaries (occurrence ≠ value; associativity/unit modulo residual reassociation) | Derivation | L-ASSOC / L-UNIT families |
-| **L4** | Representation theorems (CPS, coend/co-Yoneda, Van Laarhoven form, the Either reading) | Cited proofs + premises | Paper proofs — [docs/foundation.md](docs/foundation.md) §5 |
+| **L4** | Representation theorems (CPS, coend/co-Yoneda, Van Laarhoven form, the Either and effectful readings) | Cited proofs + premises | Paper proofs — [docs/foundation.md](docs/foundation.md) §5 |
 | **L5** | Contracts (domains, failure modes, input invariance) | Documentation + conformance matrix | [docs/conformance.md](docs/conformance.md) |
 | **L6** | Engineering constraints (scope and process) | Review / CI | [ROADMAP.md](ROADMAP.md) §0 |
 
-**Test families.** The suite is law-id tagged — `L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`, `L-UNIT`, `L-NORM`, `L-TVL` — plus their partial success-premise variants (`prop_*E_*`), contract groups (`focusAt`, `elementAt`, `elementE`, snapshot contracts, discriminators), the failure-channel wiring group (`FocusingE`), navigation, and regression groups; per-instance witnesses are listed in the conformance matrix.
+**Test families.** The suite is law-id tagged — `L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`, `L-UNIT`, `L-NORM`, `L-TVL` — plus their partial success-premise variants (`prop_*E_*`), contract groups (`focusAt`, `elementAt`, `elementE`, snapshot contracts, discriminators), the failure-channel wiring group (`FocusingE`), the effectful groups (`FocusingM`: laws, composition/embedding/store, discriminators), navigation, and regression groups; per-instance witnesses are listed in the conformance matrix.
 
 **Boundary notes.** `XA` (type endpoints): deferred — requires indexed GADTs. `XC` (navigation normalization): decidable-child assumption not formalized. `XE` (sharing boundary): occurrence focus ≠ vertex focus for DAGs — documented boundary. `XF` (strategy externalization): no strategy in `plugF`, by design. `XG` (computability witness): `ZipTree` child selection defaults to `Int`; not yet exposed.
 
 ### Coverage
 
-The test suite has **85 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
+The test suite has **105 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 

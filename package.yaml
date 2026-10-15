@@ -44,6 +44,7 @@ library:
   - Focal.Zipper
   - Focal.Interop
   - Focal.Partial
+  - Focal.Effectful
 
 executables:
   Focal-exe:
@@ -69,6 +70,7 @@ tests:
     - tasty
     - tasty-quickcheck
     - QuickCheck
+    - mtl
   Focal-doctest:
     main:                Doctest.hs
     source-dirs:         test-doctest

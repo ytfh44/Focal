@@ -13,6 +13,7 @@
 --   * "Focal.Zipper" — 'ZipTree', 'Zip', navigation, tree instances, 'fromZip'/'focusAt'
 --   * "Focal.Interop" — 'VLens', 'PStore', 'toVL', 'fromVL', 'normalize'
 --   * "Focal.Partial" — 'FocusingE', 'composeE', 'overE', 'toStoreE'
+--   * "Focal.Effectful" — 'FocusingM', 'composeM', 'overM', 'storeM'
 module Lib
   ( module Focal.Core
   , module Focal.Tuple
@@ -20,6 +21,7 @@ module Lib
   , module Focal.Zipper
   , module Focal.Interop
   , module Focal.Partial
+  , module Focal.Effectful
   ) where
 
 import Focal.Core
@@ -28,3 +30,4 @@ import Focal.List
 import Focal.Zipper
 import Focal.Interop
 import Focal.Partial
+import Focal.Effectful

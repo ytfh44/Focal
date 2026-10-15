@@ -4,6 +4,7 @@
 module Main (main) where
 
 import Control.Exception (ErrorCall, evaluate, try)
+import Control.Monad.State (State, get, put, runState)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
 import Test.Tasty
@@ -15,6 +16,7 @@ import Focal.List
 import Focal.Zipper
 import Focal.Interop
 import Focal.Partial
+import Focal.Effectful
 
 main :: IO ()
 main = defaultMain tests
@@ -154,6 +156,32 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       [ testProperty "unconditional PP needs the success premise" prop_discE_ppNeedsSuccess
       , testProperty "unconditional OVF is false" prop_discE_uncondOVF
       ]
+  , testGroup "FocusingM — effectful laws (success / effect conditions)"
+      [ testProperty "logM: GP (no-op update is pure)" prop_lgpM_log
+      , testProperty "absM: GP" prop_lgpM_abs
+      , testProperty "checkedM: GP on the domain (s >= 0)" prop_lgpM_checkedDomain
+      , testProperty "restoreM: GP at every initial state" prop_lgpM_restore
+      , testProperty "logM: PG (continuation form)" prop_lpgM_log
+      , testProperty "absM: PG (continuation form)" prop_lpgM_abs
+      , testProperty "checkedM: PG (continuation form)" prop_lpgM_checked
+      , testProperty "restoreM: PG (continuation form, all states)" prop_lpgM_restore
+      , testProperty "restoreM: PP (replay-insensitive)" prop_lppM_restore
+      , testProperty "checkedM: PP conditional on a successful write" prop_lppM_checked
+      ]
+  , testGroup "FocusingM — composition, unit, embedding, store"
+      [ testProperty "GP preserved: composeM logM logM" prop_compM_gp_log
+      , testProperty "GP preserved: composeM restoreM restoreM" prop_compM_gp_restore
+      , testProperty "idM >>> logM observes like logM" prop_lunitM_log
+      , testProperty "associativity: (logM >>> logM) >>> logM" prop_lassocM_log
+      , testProperty "storeM/fromStoreM roundtrip (logM)" prop_storeM_roundtrip_log
+      , testProperty "toEffectful embedding: fstF no-op rebuild" prop_embM_pure
+      , testProperty "toEffectfulE agrees with overE (elementE)" prop_embME_agree
+      ]
+  , testGroup "Law discriminators — effectful (FocusingM)"
+      [ testProperty "bare PG (effects must vanish) is false" prop_discM_barePg
+      , testProperty "PP fails for logging (replay is observable)" prop_discM_ppLog
+      , testProperty "PP fails unconditionally for partial plugs" prop_discM_ppPartial
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -224,6 +252,52 @@ plugFailE = FocusingE
   { splitE = \s -> Right (s, ())
   , plugE  = \() _ -> Left "plug-first"
   }
+
+--------------------------------------------------------------------
+-- FocusingM fixtures (effectful rebuild)
+--------------------------------------------------------------------
+
+type Log = (,) [String]
+
+-- | Logging lens: the log records every actual change of the focused value
+--   (a non-commutative monoid, so replay order is observable).
+logM :: FocusingM Log Int Int Int Int Int
+logM = FocusingM
+  { splitM = \s -> ([], (s, s))
+  , plugM  = \c b -> (if c /= b then ["changed " ++ show c ++ "->" ++ show b] else [], b)
+  }
+
+-- | Partial absolute-value lens (Maybe): fails on a negative replacement.
+absM :: FocusingM Maybe Int Int Int Int Int
+absM = FocusingM
+  { splitM = \s -> Just (abs s, s)
+  , plugM  = \c b -> if b < 0 then Nothing else Just (if c < 0 then negate b else b)
+  }
+
+-- | Checked lens (Either): declared domain @s >= 0@ for split and @b >= 0@
+--   for plug; plug ignores the residual, so PP holds on successful writes.
+checkedM :: FocusingM (Either String) Int Int Int Int Int
+checkedM = FocusingM
+  { splitM = \s -> if s < 0 then Left "split: negative" else Right (s, s)
+  , plugM  = \_ b -> if b < 0 then Left "plug: negative" else Right b
+  }
+
+-- | Stateful restore lens: the residual snapshots the state; a successful
+--   write restores the snapshot, so a replay cannot be observed.
+restoreM :: FocusingM (State Bool) Bool Int Int Int Int
+restoreM = FocusingM
+  { splitM = \s -> do
+      st <- get
+      pure (s, st)
+  , plugM = \c b -> do
+      st <- get
+      if st /= c then put c else pure ()
+      pure b
+  }
+
+-- | Run a state action from both initial states and compare.
+stEqM :: Eq x => State Bool x -> State Bool x -> Bool
+stEqM a b = and [runState a st == runState b st | st <- [True, False]]
 
 --------------------------------------------------------------------
 -- L-GP — Split-plug reconstruction
@@ -955,6 +1029,115 @@ prop_elementE_matchesElementF xs nn =
     in case elementF i of
          Nothing -> property False
          Just f  -> overE (elementE i) (+1) xs === Right (overF f (+1) xs)
+
+--------------------------------------------------------------------
+-- FocusingM — effectful laws (success / effect conditions)
+--------------------------------------------------------------------
+
+prop_lgpM_log :: Int -> Bool
+prop_lgpM_log s = (splitM logM s >>= \(a, c) -> plugM logM c a) == ([], s)
+
+prop_lgpM_abs :: Int -> Bool
+prop_lgpM_abs s = (splitM absM s >>= \(a, c) -> plugM absM c a) == Just s
+
+prop_lgpM_checkedDomain :: NonNegative Int -> Bool
+prop_lgpM_checkedDomain (NonNegative s) =
+  (splitM checkedM s >>= \(a, c) -> plugM checkedM c a) == Right s
+
+prop_lgpM_restore :: Int -> Bool
+prop_lgpM_restore s =
+  stEqM (splitM restoreM s >>= \(a, c) -> plugM restoreM c a) (pure s)
+
+prop_lpgM_log :: Int -> Int -> Bool
+prop_lpgM_log c b =
+  (do t <- plugM logM c b; (a', c') <- splitM logM t; pure (t, (a', c'), a'))
+    == (do t <- plugM logM c b; (a', c') <- splitM logM t; pure (t, (a', c'), b))
+
+prop_lpgM_abs :: Int -> Int -> Bool
+prop_lpgM_abs c b =
+  (do t <- plugM absM c b; (a', c') <- splitM absM t; pure (t, (a', c'), a'))
+    == (do t <- plugM absM c b; (a', c') <- splitM absM t; pure (t, (a', c'), b))
+
+prop_lpgM_checked :: Int -> Int -> Bool
+prop_lpgM_checked c b =
+  (do t <- plugM checkedM c b; (a', c') <- splitM checkedM t; pure (t, (a', c'), a'))
+    == (do t <- plugM checkedM c b; (a', c') <- splitM checkedM t; pure (t, (a', c'), b))
+
+prop_lpgM_restore :: Bool -> Int -> Bool
+prop_lpgM_restore c b =
+  stEqM (do t <- plugM restoreM c b; (a', c') <- splitM restoreM t; pure (t, (a', c'), a'))
+        (do t <- plugM restoreM c b; (a', c') <- splitM restoreM t; pure (t, (a', c'), b))
+
+prop_lppM_restore :: Bool -> Int -> Int -> Bool
+prop_lppM_restore c b1 b2 =
+  stEqM (do t <- plugM restoreM c b1; (_, c') <- splitM restoreM t; plugM restoreM c' b2)
+        (plugM restoreM c b2)
+
+prop_lppM_checked :: Int -> Int -> Int -> Property
+prop_lppM_checked c b1 b2 =
+  case plugM checkedM c b1 of
+    Left _        -> property True
+    Right t       -> case splitM checkedM t of
+      Left _        -> property False
+      Right (_, c') -> plugM checkedM c' b2 === plugM checkedM c b2
+
+--------------------------------------------------------------------
+-- FocusingM — composition, unit, embedding, store
+--------------------------------------------------------------------
+
+prop_compM_gp_log :: Int -> Bool
+prop_compM_gp_log s =
+  let p = composeM logM logM
+  in (splitM p s >>= \(a, c) -> plugM p c a) == ([], s)
+
+prop_compM_gp_restore :: Int -> Bool
+prop_compM_gp_restore s =
+  let p = composeM restoreM restoreM
+  in stEqM (splitM p s >>= \(a, c) -> plugM p c a) (pure s)
+
+prop_lunitM_log :: Int -> Int -> Bool
+prop_lunitM_log s b =
+  fmap (\(a, k) -> (a, k b)) (storeM (composeM idM logM) s)
+    == fmap (\(a, k) -> (a, k b)) (storeM logM s)
+
+prop_lassocM_log :: Int -> Int -> Bool
+prop_lassocM_log s b =
+  let obs p = fmap (\(a, k) -> (a, k b)) (storeM p s)
+  in obs (composeM (composeM logM logM) logM) == obs (composeM logM (composeM logM logM))
+
+prop_storeM_roundtrip_log :: Int -> Int -> Bool
+prop_storeM_roundtrip_log s b =
+  fmap (\(a, k) -> (a, k b)) (storeM logM s)
+    == fmap (\(a, k) -> (a, k b)) (storeM (fromStoreM (storeM logM)) s)
+
+prop_embM_pure :: (Int, Bool) -> Bool
+prop_embM_pure p =
+  overM (toEffectful (fstF :: Focusing Bool (Int, Bool) (Int, Bool) Int Int)) id p
+    == (Just p :: Maybe (Int, Bool))
+
+prop_embME_agree :: [Int] -> NonNegative Int -> Property
+prop_embME_agree xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in overM (toEffectfulE (elementE i)) (+1) xs === overE (elementE i) (+1) xs
+
+--------------------------------------------------------------------
+-- Law discriminators — effectful (FocusingM)
+--------------------------------------------------------------------
+
+prop_discM_barePg :: Bool
+prop_discM_barePg =
+  (do t <- plugM logM 0 1; (a', _) <- splitM logM t; pure a') /= pure (1 :: Int)
+
+prop_discM_ppLog :: Bool
+prop_discM_ppLog =
+  (do t <- plugM logM (-2) (-1); (_, c') <- splitM logM t; plugM logM c' (-2))
+    /= plugM logM (-2) (-2)
+
+prop_discM_ppPartial :: Bool
+prop_discM_ppPartial =
+  (do t <- plugM checkedM 0 (-1); (_, c') <- splitM checkedM t; plugM checkedM c' 5)
+    /= plugM checkedM 0 5
 
 --------------------------------------------------------------------
 -- QuickCheck generators

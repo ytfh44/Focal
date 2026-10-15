@@ -24,6 +24,7 @@ not an instance (projection).
 | `Focal` | N/A | N/A | N/A | N/A | — | no exported operations tested directly; laws at the `Focal` level are extensional (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | constructor hidden; `mkFocal`/`withFocal` + `Focal.Interop` shipped |
 | `Focal.Interop` (`toVL`/`fromVL`/`normalize`) | — | — | — | — | — | rank-2 CPS via `mkFocal`/`withFocal`; extensional only (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | conversions are extensional; residual not recoverable |
 | `Focal.Partial` (`FocusingE`, `composeE`, `overE`, `toStoreE`) | — | — | — | — | — | failures in return values; laws carry success premises (foundation §3) | `prop_lgpE_*`, `prop_lpgE_*`, `prop_lppE_*`, `prop_lovfE_*`, `prop_scE_*`, `prop_embE_compose`, `prop_storeE_roundtrip` | rank ≤ 1; `toStoreE` extensional; `prop_discE_*` pins the premise necessity |
+| `Focal.Effectful` (`FocusingM`, `composeM`, `overM`, `storeM`) | — | — | — | — | — | GP/PG as Kleisli equations (PG in continuation form); PP per instance (replay-sensitive, foundation §3) | `prop_lgpM_*`, `prop_lpgM_*`, `prop_lppM_*`, `prop_compM_*`, `prop_lunitM_*`, `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*` | GP/PG composition closure holds for every monad; `prop_discM_*` pins the forced premises |
 
 Verdict footnotes:
 
@@ -40,20 +41,23 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree (**85 properties**,
+Reviewed property-by-property against the working tree (**105 properties**,
 plus the doctest suite):
 
-- **L-GP: 11 of 85** (`prop_lgp_*`, partial `prop_lgpE_*`).
-- **L-PG: 9 of 85** (`prop_lpg_*`, partial `prop_lpgE_*`).
-- **L-PP: 7 of 85** (`prop_lpp_*`, partial `prop_lppE_*`; one trivially-satisfied
-  snapshot case, `prop_lpp_fromZip`).
-- **L-OVF: 5 of 85** (`prop_lovf_*` — four instances plus the partial
+- **L-GP: 11 of 105** (`prop_lgp_*`, partial `prop_lgpE_*`; effectful `prop_lgpM_*`).
+- **L-PG: 9 of 105** (`prop_lpg_*`, partial `prop_lpgE_*`; effectful `prop_lpgM_*`).
+- **L-PP: 7 of 105** (`prop_lpp_*`, partial `prop_lppE_*`, effectful `prop_lppM_*`;
+  one trivially-satisfied snapshot case, `prop_lpp_fromZip`).
+- **L-OVF: 5 of 105** (`prop_lovf_*` — four instances plus the partial
   success-prefix case).
-- **L-ASSOC: 3 of 85** (`prop_lassoc_*`); **L-UNIT: 6 of 85** (`prop_lunit_*`).
-- **L-NORM: 2 of 85** (`prop_lnorm_*`); **L-TVL: 2 of 85** (`prop_ltvl_*`).
-- **Partial channel: 6 of 85** (`prop_scE_*`, `prop_embE_compose`,
+- **L-ASSOC: 3 of 105** (`prop_lassoc_*`); **L-UNIT: 6 of 105** (`prop_lunit_*`).
+- **L-NORM: 2 of 105** (`prop_lnorm_*`); **L-TVL: 2 of 105** (`prop_ltvl_*`).
+- **Partial channel: 6 of 105** (`prop_scE_*`, `prop_embE_compose`,
   `prop_storeE_roundtrip`, `prop_discE_*`).
-- **`elementE` contract: 7 of 85** (`prop_elementE_*`).
+- **`elementE` contract: 7 of 105** (`prop_elementE_*`).
+- **Effectful rung: 20 of 105** (`prop_lgpM_*`, `prop_lpgM_*`, `prop_lppM_*`,
+  `prop_compM_*`, `prop_lunitM_*`, `prop_lassocM_*`, `prop_storeM_*`,
+  `prop_embM*`, `prop_discM_*`).
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,

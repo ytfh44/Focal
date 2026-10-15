@@ -34,5 +34,11 @@ and this project adheres to the
   failure-channel list focus (per-call index check; total plug). Suite at 85
   properties; docs counts updated.
 
+- Added `Focal.Effectful` (`FocusingM`, `idM`, `composeM`, `overM`,
+  `toEffectful`, `toEffectfulE`, `storeM`, `fromStoreM`): both legs in a monad
+  (failure, validation, logging, state); GP/PG as Kleisli equations, preserved
+  by composition for every monad; PP per instance. Test suite: 105
+  law-id-tagged properties.
+
 ## 0.1.0.0 - YYYY-MM-DD
 
