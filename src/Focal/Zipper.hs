@@ -131,20 +131,30 @@ safeNavigate path t = go path (rootZip t)
 
 -- | Convert a zipper to a 'Focusing'. The residual is the context stack.
 --
---   Note: @splitF@ ignores its argument because the focus is already
---   determined by the zipper.
+--   Snapshot semantics: @splitF@ ignores its argument and returns the focus
+--   and context captured in the zipper. It is input-invariant only for the
+--   tree the zipper was built from, and not a general split-plug lawful
+--   instance for other sources (docs/conformance.md). Dynamic path-focused
+--   construction is tracked in ROADMAP 0d.
 fromZip :: ZipTree t => Zip t -> Focusing [Frame t] t t t t
 fromZip z = Focusing
   { splitF = \_ -> (current z, context z)
   , plugF  = \ctx b -> rebuild b ctx
   }
 
--- | Create a 'Focusing' for a given path, returning 'Nothing' if the path
---   does not exist in the tree.
+-- | Create a snapshot 'Focusing' for a given path, returning 'Nothing' if
+--   the path does not exist in the tree.
+--
+--   Same snapshot semantics as 'fromZip'. 'Nothing' covers only the path
+--   check against the supplied tree @t@ — not any other source the
+--   'Focusing' may later be applied to.
 safeFocusAt :: ZipTree t => [Child t] -> t -> Maybe (Focusing [Frame t] t t t t)
 safeFocusAt path t = fromZip <$> safeNavigate path t
 
 -- | Unsafe version of 'safeFocusAt'. Throws an error if the path is invalid.
+--
+--   Same snapshot semantics as 'safeFocusAt'; the error is raised before any
+--   'Focusing' is built.
 unsafeFocusAt :: (ZipTree t, HasCallStack, Show (Child t)) => [Child t] -> t -> Focusing [Frame t] t t t t
 unsafeFocusAt path t =
   case safeNavigate path t of

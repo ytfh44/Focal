@@ -24,18 +24,17 @@ import Focal.Core (Focusing(..))
 --   @left = [1]@, @right = [3]@.
 type ListCtx a = ([a], [a])
 
--- | Safe list element focus. Returns 'Nothing' for negative indices.
+-- | Safe list element focus. Returns 'Nothing' for negative indices; that
+--   is the only construction-time check.
 --
---   For positive indices, the returned 'Focusing' carries a partial 'splitF'
---   — if the index exceeds the list length, 'splitF' errors lazily when
---   applied to a list. This is a consequence of 'Focusing' being total;
---   the check cannot be performed at construction time without the list.
+--   Declared domain: @0 <= n < length xs@. Outside it (on the list side),
+--   'splitF' raises a delayed 'error': 'Focusing' has no failure channel, so
+--   the bounds check cannot run at construction time. A check-at-construction
+--   variant (@elementAt@) is planned; see ROADMAP 0c.
 --
---   >>> elementF 1 "abc"
---   Just (Focusing ...)  -- focuses on 'b'
---
---   >>> elementF 99 "abc"
---   Nothing
+--   >>> import Focal.Core (overF)
+--   >>> fmap (\f -> overF f (*10) [1,2,3]) (elementF 1)
+--   Just [1,20,3]
 elementF :: Int -> Maybe (Focusing (ListCtx a) [a] [a] a a)
 elementF n
   | n < 0 = Nothing

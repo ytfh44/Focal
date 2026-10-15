@@ -127,11 +127,12 @@ overF f g s =
   let (a, c) = splitF f s
   in plugF f c (g a)
 
--- | Monadic bridge. Apply a monadic function to the focus while keeping
---   the 'Focusing' itself pure. Effects belong to the outer 'Monad'.
+-- | Functor-level bridge. Apply an effectful function to the focus while
+--   keeping the 'Focusing' itself pure. Only 'Functor' is required.
 --
---   This follows the \"effect exteralization\" principle: Focal handles
---   spatial decomposition; Monad handles temporal sequencing.
+--   This is the Van Laarhoven interpretation formula: @fmap rebuild (k a)@
+--   where @(a, c) = splitF f s@ and @rebuild = plugF f c@. Focal handles
+--   spatial decomposition; the functor handles external interpretation.
 overFM :: Functor m => Focusing c s t a b -> (a -> m b) -> s -> m t
 overFM f k s =
   let (a, c) = splitF f s

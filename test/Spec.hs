@@ -16,12 +16,12 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Focal — Axiom Coverage"
+tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
   [ ---------------------------------------------------------------
-    -- Axiom 1: Split-Plug Reconstruction
+    -- L-GP: Split-Plug Reconstruction (was A1)
     --   let (a, c) = splitF f s in plugF f c a == s
     ---------------------------------------------------------------
-    testGroup "A1 — Split-Plug Reconstruction"
+    testGroup "L-GP — Split-Plug Reconstruction (was A1)"
       [ testProperty "idF: plug original focus = s"           prop_a1_idF
       , testProperty "fstF: plug original focus = s"          prop_a1_fstF
       , testProperty "sndF: plug original focus = s"          prop_a1_sndF
@@ -33,23 +33,23 @@ tests = testGroup "Focal — Axiom Coverage"
       ]
 
   ---------------------------------------------------------------
-  -- Axiom 2: Residual Legality
-  --   Residual must carry validity relative to source (not forgeable).
-  --   The Focal existential quantifier hides c; the splitF→plugF
-  --   roundtrip is the witnessed validity.
+  -- (was A2) Restatements of L-GP.
+  --   These three properties re-assert the split-plug roundtrip; they do
+  --   not test a separate residual-legality claim (see docs/conformance.md).
   ---------------------------------------------------------------
-  , testGroup "A2 — Residual Legality"
+  , testGroup "L-GP restatements (was A2)"
       [ testProperty "idF residual () paired with s always restores"  prop_a2_idF
       , testProperty "list residual depends on source length"          prop_a2_list_depends
       , testProperty "Rose residual depends on exact source"           prop_a2_rose_depends
       ]
 
   ---------------------------------------------------------------
-  -- Axiom 3: Composition Associativity
+  -- L-ASSOC: Composition Associativity (was A3)
   --   (f >>> g) >>> h  ≃  f >>> (g >>> h)
   --   Up to residual tuple reassociation: ((c1,c2),c3) ≃ (c1,(c2,c3))
+  --   (prop_a3_plugLaw re-checks the definitional plug law of composeF.)
   ---------------------------------------------------------------
-  , testGroup "A3 — Composition Associativity"
+  , testGroup "L-ASSOC — Composition Associativity (was A3)"
       [ testProperty "idF chain: behavioural equivalence"            prop_a3_idChain
       , testProperty "tuple chain: mixed focus type"                 prop_a3_tupleChain
       , testProperty "list into tuple composition"                   prop_a3_listTupleChain
@@ -57,10 +57,10 @@ tests = testGroup "Focal — Axiom Coverage"
       ]
 
   ---------------------------------------------------------------
-  -- Axiom 4: Identity Focus
+  -- L-UNIT: Identity Focus (was A4)
   --   idF >>> f  ≃  f       f >>> idF  ≃  f
   ---------------------------------------------------------------
-  , testGroup "A4 — Identity Focus"
+  , testGroup "L-UNIT — Identity Focus (was A4)"
       [ testProperty "idF >>> fstF  ≈  fstF"              prop_a4_leftId_fst
       , testProperty "idF >>> elementF ≈ elementF"        prop_a4_leftId_list
       , testProperty "idF >>> fromZip ≈ fromZip"          prop_a4_leftId_zipper
@@ -70,30 +70,31 @@ tests = testGroup "Focal — Axiom Coverage"
       ]
 
   ---------------------------------------------------------------
-  -- Axiom 5: Locality
+  -- Locality (was A5) — an L0 structure fact, not an axiom.
   --   plugF : c -> b -> t  (no Env, no IO, no global state).
-  --   Statically enforced by type signature; tested via purity check.
+  --   Signature-level; the single property below is definitional smoke only.
   ---------------------------------------------------------------
-  , testGroup "A5 — Locality (purity)"
+  , testGroup "Locality — type fact, smoke only (was A5)"
       [ testProperty "overFM pure = overF (no effect dependency)"   prop_a5_overFM_pure
       ]
 
   ---------------------------------------------------------------
-  -- Axiom 6: Occurrence ≠ Value
+  -- Occurrence ≠ Value (was A6) — a corollary of L-GP.
   --   focus position = (a, c), not just a.
   --   Two different occurrences of the same value yield different residuals.
   ---------------------------------------------------------------
-  , testGroup "A6 — Occurrence ≠ Value"
+  , testGroup "Occurrence ≠ value — corollary of L-GP (was A6)"
       [ testProperty "list: equal values at different indices"     prop_a6_list
       , testProperty "Rose: equal subtrees at different paths"     prop_a6_rose
       , testProperty "BinTree: equal leaves at different paths"    prop_a6_binTree
       ]
 
   ---------------------------------------------------------------
-  -- Extension Axiom B: Path—Residual Consistency
+  -- Navigation & path tests (was XB).
   --   position -> (focus, residual)  and  (focus, residual, valid) -> position
+  --   (prop_xb_fromZip_roundtrip is an L-GP restatement for the snapshot.)
   ---------------------------------------------------------------
-  , testGroup "XB — Path-Residual Consistency"
+  , testGroup "Navigation & path tests (was XB)"
       [ testProperty "Rose: safeFocusAt valid path extracts child"        prop_xb_safeFocusAt_valid
       , testProperty "Rose: safeFocusAt invalid path = Nothing"           prop_xb_safeFocusAt_invalid
       , testProperty "Rose: fromZip roundtrip from focused position"      prop_xb_fromZip_roundtrip
@@ -101,11 +102,13 @@ tests = testGroup "Focal — Axiom Coverage"
       ]
 
   ---------------------------------------------------------------
-  -- Extension Axiom D: Edit Survival (prefix-controlled fragment)
-  --   On the same focus, latter overwrites former.
-  --   Nested edits decompose correctly into outer focus.
+  -- Edit survival tests (was XD).
+  --   On the same focus, latter overwrites former; nested edits decompose
+  --   correctly into the outer focus.
+  --   prop_xd_sameFocus_overwrite is a narrow L-OVF instance
+  --   (fixed function pair; see docs/conformance.md).
   ---------------------------------------------------------------
-  , testGroup "XD — Edit Survival"
+  , testGroup "Edit survival tests (was XD)"
       [ testProperty "same-focus edits compose via overF"           prop_xd_sameFocus_overwrite
       , testProperty "nested edit decomposes correctly"             prop_xd_nestedEdit
       , testProperty "independent foci commute"                     prop_xd_independentFoci
@@ -148,7 +151,7 @@ tests = testGroup "Focal — Axiom Coverage"
   ]
 
 --------------------------------------------------------------------
--- Axiom 1: Split-Plug Reconstruction
+-- L-GP: Split-Plug Reconstruction (was A1)
 --------------------------------------------------------------------
 
 prop_a1_idF :: Int -> Bool
@@ -204,7 +207,7 @@ prop_a1_composed pair =
     plugF f ctx focus === pair
 
 --------------------------------------------------------------------
--- Axiom 2: Residual Legality
+-- (was A2) L-GP restatements
 --------------------------------------------------------------------
 
 prop_a2_idF :: Int -> Bool
@@ -230,7 +233,7 @@ prop_a2_rose_depends t@(Rose _ kids) =
     plugF f ctx focus' === t
 
 --------------------------------------------------------------------
--- Axiom 3: Composition Associativity
+-- L-ASSOC: Composition Associativity (was A3)
 --------------------------------------------------------------------
 
 prop_a3_idChain :: Int -> Bool
@@ -270,7 +273,7 @@ prop_a3_plugLaw pair =
     plugF combined (c1, c2) y === plugF f c1 (plugF g c2 y)
 
 --------------------------------------------------------------------
--- Axiom 4: Identity Focus
+-- L-UNIT: Identity Focus (was A4)
 --------------------------------------------------------------------
 
 prop_a4_leftId_fst :: (Int, Int) -> Bool
@@ -312,7 +315,7 @@ prop_a4_rightId_zipper t@(Rose _ kids) =
     overF (f >>> idF) id t === overF f id t
 
 --------------------------------------------------------------------
--- Axiom 5: Locality (purity)
+-- Locality (was A5): L0 structure fact, definitional smoke test
 --------------------------------------------------------------------
 
 prop_a5_overFM_pure :: [Int] -> NonNegative Int -> Property
@@ -323,7 +326,7 @@ prop_a5_overFM_pure xs (NonNegative n) =
     overFM f (Identity . id) xs === Identity (overF f id xs)
 
 --------------------------------------------------------------------
--- Axiom 6: Occurrence ≠ Value
+-- Occurrence ≠ value (was A6): corollary of L-GP
 --------------------------------------------------------------------
 
 prop_a6_list :: [Int] -> Property
@@ -366,7 +369,7 @@ prop_a6_binTree =
       Nothing -> property True
 
 --------------------------------------------------------------------
--- Extension Axiom B: Path—Residual Consistency
+-- Navigation & path tests (was XB)
 --------------------------------------------------------------------
 
 prop_xb_safeFocusAt_valid :: Rose Int -> Property
@@ -412,7 +415,7 @@ prop_xb_multilevel t@(Rose _ kids) =
       _ -> property True
 
 --------------------------------------------------------------------
--- Extension Axiom D: Edit Survival (prefix-controlled)
+-- Edit survival tests (was XD)
 --------------------------------------------------------------------
 
 prop_xd_sameFocus_overwrite :: [Int] -> NonNegative Int -> Property
