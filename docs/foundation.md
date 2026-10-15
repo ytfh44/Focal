@@ -230,13 +230,13 @@ phrases do not survive anywhere in this repository (see the audit note below).
 | D2 | README axiom-status column | A1/A2/A4/A6 were marked as structurally enforced although the constructor is public and `plugF` receives no `s` | "Enforced by" columns state assumption + per-instance witnesses (§2) |
 | D3 | README "What's in scope", item 1 | Asserted both functions to be total and deterministic | "Total on their declared domains"; partiality policy §4.1 + conformance registry |
 | D4 | README, old axiom chapter opening | Called the interface lawful without stating any law | "Interface with explicit law obligations": obligations enumerated as law-ids (§3) |
-| D5 | README, Lens-like section | Claimed a general interop surface with `lens`/`optics`, including conversions that are not shipped | Limited to the shipped `toStoreLike` projection; `toVL`/`fromVL` scheduled (ROADMAP 0e), extensional only (§5) |
+| D5 | README, Lens-like section | Claimed a general interop surface with `lens`/`optics`, including conversions that are not shipped | Limited to the shipped `toStoreLike` projection; `toVL`/`fromVL` ship in `Focal.Interop` — extensional only (§5) |
 | D6 | README boundary sentence, demo comment, `overFM` haddock | Framed the bridge as monadic, implying a `Monad` requirement | Functor-level wording: only `Functor` is required; Van Laarhoven interpretation formula |
-| D7 | README, A5 row | Locality was listed as an axiom with test coverage | L0 structure fact (signature-level); the single smoke test is definitional (conformance) |
+| D7 | README, A5 row | Locality was listed as an axiom with test coverage | L0 structure fact (signature-level); no law or witness claimed (conformance) |
 | D8 | README quick start + `fromZip` haddock | Snapshot builders were presented as general path focus; the demo comment did not match the operation | Snapshot semantics documented (input-invariance exemption §4.2); demo comment matches `(*10)` |
 | D9 | `Focal.Core`, `overFM` haddock | Contained a typo in the phrase describing effect externalization and assigned sequencing to `Monad` | Rewritten paragraph (typo removed; `Functor` only) |
-| D10 | `test/Spec.hs`, headers | Group titles asserted an "Axiom 1–6" scheme, and a comment claimed residuals cannot be forged | Law-id mapping ("was A#"); the forgery claim replaced by a conformance pointer |
-| D11 | README, coverage summary | Implied the property suite covered each listed axiom, including a residual-legality claim | Honest statement: property count kept; no property directly asserts L-PG or L-PP; classification and gaps in conformance |
+| D10 | `test/Spec.hs`, headers | Group titles asserted an "Axiom 1–6" scheme, and a comment claimed residuals cannot be forged | Law-id group titles; the forgery claim replaced by a conformance pointer |
+| D11 | README, coverage summary | Implied the property suite covered each listed axiom, including a residual-legality claim | Honest statement: property count kept; per-law witnesses and classification in conformance |
 | D12 | README, specialization tables | Rows needing extended rungs were listed alongside core-supportable ones; the zipper row lacked the snapshot note | Table footnotes: extended rungs (`FocusingE`/`FocusingM`); snapshot semantics |
 | D13 | README, related work | Claimed strong representation results while omitting the representation-theorem references | Jaskelioff–O'Connor 2015 and the coend/co-Yoneda reference added (§5) |
 

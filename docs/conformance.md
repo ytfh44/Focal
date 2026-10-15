@@ -53,7 +53,3 @@ plus the doctest suite):
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,
   2 concrete regressions, 1 `elementF` contract test, 1 edit-independence
   observation.
-
-Resolved in ROADMAP 0b: the `prop_a2_*` trio, `prop_a3_plugLaw`, and
-`prop_xb_fromZip_roundtrip` were duplicate/definitional entries and no longer
-exist.

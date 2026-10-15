@@ -26,10 +26,10 @@ Standing constraints — checked at every review; they have no completion state.
 
 ## P0 — Foundations
 
-0a. Land the foundation documentation: `docs/foundation.md` (A-LENS, L0–L6, law vocabulary, contracts, representation ladder, defect log), `docs/conformance.md` (instance × law matrix), README "Law status", and this roadmap. **Delivered by the current change.**
+0a. Land the foundation documentation: `docs/foundation.md` (A-LENS, L0–L6, law vocabulary, contracts, representation ladder, defect log), `docs/conformance.md` (instance × law matrix), README "Law status", and this roadmap.
 Depends on: —. Done = ① documents merged ② build and tests green ③ the retired-phrase audit described in `docs/foundation.md` §6 stays clean. [x]
 
-0b. Rewrite tests by law-id: drop duplicates and definitional entries; add witnesses for L-PG and L-PP (none exist today); broaden L-OVF coverage beyond its single fixed-pair instance; add snapshot-contract tests for `fromZip`; annotate every property with its law-id.
+0b. Rewrite tests by law-id: drop duplicates and definitional entries; add witnesses for L-PG and L-PP; broaden L-OVF coverage; add snapshot-contract tests for `fromZip`; annotate every property with its law-id.
 Depends on: 0a. Done = ① every conformance row claiming L-PG/L-PP has a green witness ② conformance matrix updated ③ no property name overstates what it checks. [x]
 
 0c. List contract fixes: add `elementAt` (construction-time bounds check; total for `0 <= n < length` via `Maybe`/`Either`); turn the `Focal.List` haddock examples into genuinely runnable doctests; keep the deferred-error behavior of `elementF`/`unsafeElementF` documented.
@@ -44,6 +44,7 @@ Depends on: 0a. Done = ① conversions implemented and tested extensionally ② 
 
 0f. Promote `Focal.Laws`: extract the shared law combinators once a second in-repo consumer exists.
 Depends on: 0b, 0e. Done = ① ≥ 2 in-repo consumers of the shared combinators.
+Status: held — trigger not met; one in-repo consumer (`test/Spec.hs`).
 
 0g. Enforcement: doctest gate in CI; law-id-tagged property output.
 Depends on: 0b, 0c. Done = ① CI fails on failing doctests ② test output prints law-id labels. [x]
@@ -53,31 +54,31 @@ Depends on: 0b, 0c. Done = ① CI fails on failing doctests ② test output prin
 ## P1 — Core package and hardening (items 1–8)
 
 1. Establish the `focal-core` package boundary. Exports follow the current modules (`src/Focal/Core.hs` et al.); the encapsulation decision for `Focal` is tracked in 0e.
-Depends on: 0a. Done = ① export list documented ② no module exports undocumented internals ③ 0e decision recorded.
+Depends on: 0a. Done = ① export list documented ② no module exports undocumented internals ③ 0e decision recorded. [x]
 
 2. Establish the law-testing framework. Subsumed by 0b (tests rewritten by law-id).
-Depends on: 0b. Done = ① 0b complete ② framework covers every law-id in `docs/foundation.md` §3.
+Depends on: 0b. Done = ① 0b complete ② framework covers every law-id in `docs/foundation.md` §3. [x]
 
 3. Backfill law tests for existing implementations (`pureF`, `fstF`, `sndF`, `idF`, `elementF`, `fromZip`). Subsumed by 0b.
-Depends on: 0b. Done = ① every shipped instance appears in the conformance matrix with witnesses or a registered gap.
+Depends on: 0b. Done = ① every shipped instance appears in the conformance matrix with witnesses or a registered gap. [x]
 
 4. Split out `Focal.Partial`: define `FocusingE e c s t a b`; move failures into `split`/`plug` return values.
-Depends on: 0a. Done = ① module exported ② rung registered in `docs/foundation.md` §1 ③ every throw site re-checked against §4.1.
+Depends on: 0a. Done = ① module exported ② rung registered in `docs/foundation.md` §1 ③ every throw site re-checked against §4.1 ④ Store/coend reading re-derived for the `Either e` codomain; rank re-checked (foundation §5).
 
 5. Rewrite the list focus: migrate `elementF` negative-index / out-of-bounds / empty-list cases into `FocusingE` (item 4); retain the total-safe API; add `elementAt` (0c).
-Depends on: 4, 0c. Done = ① `FocusingE`-based list focus ② `elementAt` landed ③ L-GP/L-PG/L-PP rows green for both.
+Depends on: 4, 0c. Done = ① `FocusingE`-based list focus ② `elementAt` landed ③ L-GP/L-PG/L-PP rows green for both list focuses (`elementF` and the `FocusingE` variant).
 
 6. Split out `Focal.Effectful`: define `FocusingM m c s t a b`; unify failure, validation, logging, and stateful reconstruction.
-Depends on: 4. Done = ① module exported ② rung registered ③ witness tests for its laws.
+Depends on: 4. Done = ① module exported ② rung registered ③ witness tests for its laws ④ Store/coend reading re-derived for the `m` codomain; rank re-checked (foundation §5).
 
 7a. Normalize residual composition (syntax): `Residual2`, `Residual3`, flatten/unflatten, pretty/debug helpers to avoid long-term exposure of deeply nested pairs.
 Depends on: 1, 4. Done = ① helpers exported ② flatten/unflatten round-trip tests.
 
 7b. `normalize` (extensional normal form for `Focal`). Tracked in 0e.
-Depends on: 0e. Done = ① implemented with L-NORM tests ② conformance row green.
+Depends on: 0e. Done = ① implemented with L-NORM tests ② conformance row green. [x]
 
 8. Publish `focal-core-0.1`: freeze the core API, laws, partial/effectful extension points, and existing strong specializations.
-Depends on: 0a–0g, 1–7b. Done = ① foundation compliance: every claim in README/haddock maps to L0–L6 with a witness or a registered gap ② conformance matrix fully green or registering explicit exemptions ③ doctest gate active (0g).
+Depends on: 0a–0e, 0g, 1–7b (0f is trigger-based — it does not gate the release). Done = ① foundation compliance: every claim in README/haddock maps to L0–L6 with a witness or a registered gap ② conformance matrix fully green or registering explicit exemptions ③ doctest gate active (0g) ④ multi-package mechanism decided (M-4).
 
 ---
 
@@ -172,13 +173,13 @@ Depends on: 31. Done = ① release published ② README/conformance reflect the 
 ## Research items (unscheduled)
 
 M-1. Multi-focus residual merge semantics.
-Depends on: —. Done = ① design note with invariants ② law-ids registered in `docs/foundation.md` §3.
+Depends on: —. Trigger: multi-focus work is scheduled (§0.3). Done = ① design note with invariants ② law-ids registered in `docs/foundation.md` §3 ③ rank/coend re-derivation (merge is not a product — the shipped composition argument does not transfer).
 
 M-2. DAG occurrence → vertex quotient (the `XE` boundary).
-Depends on: —. Done = ① quotient construction, or a documented impossibility ② conformance exemption updated.
+Depends on: —. Trigger: the `XE` boundary becomes load-bearing (a shared-subterm traversal is scheduled). Done = ① quotient construction, or a documented impossibility ② conformance exemption updated.
 
 M-3. Dissection left/right heterogeneous upgrade (type-changing residuals for `ListCtx`).
-Depends on: —. Done = ① formulation + worked example ② law statement for the asymmetric case.
+Depends on: —. Trigger: a type-changing (heterogeneous) residual use case appears. Done = ① formulation + worked example ② law statement for the asymmetric case.
 
 M-4. `Focal` → `focal-core` multi-package mechanism.
-Depends on: —. Done = ① mechanism decided (packages, versioning) ② items 1 and 0e updated accordingly.
+Depends on: —. Trigger: the item-8 release line (the mechanism is needed before publishing). Done = ① mechanism decided (packages, versioning) ② items 1 and 0e updated accordingly.
