@@ -14,11 +14,12 @@ not an instance (projection).
 | `idF` | def | def | def | def | ✓ | total; no failure mode | `prop_lgp_idF`, `prop_lassoc_idChain`, `prop_lunit_*` | definitional — no empirical content |
 | `fstF`, `sndF` | ✓ | ✓ | ✓ | ✓ | ✓ | total; no failure mode | `prop_lgp_fstF`, `prop_lgp_sndF`, `prop_lpg_fstF`, `prop_lpg_sndF`, `prop_lpp_fstF`, `prop_lovf_fstF`, `prop_lovf_sndF`, `prop_lassoc_tupleChain`, `prop_lunit_left_fst`, `prop_lunit_right_fst`, `prop_concrete_tuple` | type-changing shapes: GP/PG/PP N/A (foundation §2) |
 | `pureF`, `fromLensLike` | cnd | cnd | cnd | cnd | ✓ | inherited from the embedded `view`/`set` | `prop_lgp_pureF`, `prop_lpg_userLens`, `prop_lpp_userLens` | lawful iff the embedded pair is; non-trivial lawful instance (`userLens`) and unlawful counterexamples (`prop_disc_*`) tested; L-OVF needs the pair's put-get/put-put |
-| `elementF` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain `0 <= n < length xs`; outside it, delayed `error` from `splitF` | `prop_lgp_list`, `prop_lpg_elementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_elementf_negative` | construction-time full check is `elementAt` |
+| `elementF` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain `0 <= n < length xs`; outside it, delayed `error` from `splitF` | `prop_lgp_list`, `prop_lpg_elementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_elementf_negative` | construction-time full check is `elementAt`; failure-channel variant is `elementE` |
 | `unsafeElementF` | ✓ | ✓ | ✓ | ✓ | ✓ | `0 <= n`; immediate `error` for `n < 0`; delayed `error` for `n >= length xs` | `prop_lgp_list`, `prop_lpg_unsafeElementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_lovf_composed`, `prop_concrete_list` | in-domain behavior identical to `elementF` |
 | `fromZip` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | total; no failure mode | `prop_lgp_roseZip`, `prop_lgp_binZip`, `prop_lpp_fromZip`, `prop_lunit_left_zipper`, `prop_lunit_right_zipper`, `prop_occ_rose`, `prop_occ_binTree`, `prop_zip_multilevel`, `prop_contract_zip_ignoresInput`, `prop_contract_zip_pgCaptured` | **snapshot constructor** (foundation §4.2): `splitF` ignores its argument; snapshot contracts pinned by `prop_contract_zip_*` |
 | `focusAt` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain: trees in which `path` exists; construction returns `Nothing` if the path is absent in the given tree; `splitF` on a later tree lacking the path raises a delayed `error` | `prop_focusat_*` | dynamic (input-invariant); path-validity premise per tree (foundation §2) |
 | `elementAt` | ✓ | ✓ | ✓ | ✓ | ✓ | domain `0 <= n < length xs` of the construction list; `Nothing` otherwise; the returned `Focusing` keeps `elementF`'s delayed error off-domain | `prop_elementat_*` | checked construction-time variant of `elementF` |
+| `elementE` | ✓ | ✓ | ✓ | ✓ | ✓ | no construction failure; `splitE` checks the supplied list: `Left (NegativeIndex n)` for `n < 0`, `Left (PastEnd n)` past the end; `plugE` total | `prop_elementE_*` | failure-channel variant of `elementF`; domain `0 <= n < length xs` re-checked per call |
 | `overFM`, `toStoreLike` | — | — | — | — | — | `overFM`: Functor-level, no law beyond the functor laws; `toStoreLike`: projection | (none — no law claimed) | L-NORM / L-TVL are provided by `Focal.Interop` (shipped) |
 | `Focal` | N/A | N/A | N/A | N/A | — | no exported operations tested directly; laws at the `Focal` level are extensional (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | constructor hidden; `mkFocal`/`withFocal` + `Focal.Interop` shipped |
 | `Focal.Interop` (`toVL`/`fromVL`/`normalize`) | — | — | — | — | — | rank-2 CPS via `mkFocal`/`withFocal`; extensional only (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | conversions are extensional; residual not recoverable |
@@ -39,19 +40,20 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree (**78 properties**,
+Reviewed property-by-property against the working tree (**85 properties**,
 plus the doctest suite):
 
-- **L-GP: 11 of 78** (`prop_lgp_*`, partial `prop_lgpE_*`).
-- **L-PG: 9 of 78** (`prop_lpg_*`, partial `prop_lpgE_*`).
-- **L-PP: 7 of 78** (`prop_lpp_*`, partial `prop_lppE_*`; one trivially-satisfied
+- **L-GP: 11 of 85** (`prop_lgp_*`, partial `prop_lgpE_*`).
+- **L-PG: 9 of 85** (`prop_lpg_*`, partial `prop_lpgE_*`).
+- **L-PP: 7 of 85** (`prop_lpp_*`, partial `prop_lppE_*`; one trivially-satisfied
   snapshot case, `prop_lpp_fromZip`).
-- **L-OVF: 5 of 78** (`prop_lovf_*` — four instances plus the partial
+- **L-OVF: 5 of 85** (`prop_lovf_*` — four instances plus the partial
   success-prefix case).
-- **L-ASSOC: 3 of 78** (`prop_lassoc_*`); **L-UNIT: 6 of 78** (`prop_lunit_*`).
-- **L-NORM: 2 of 78** (`prop_lnorm_*`); **L-TVL: 2 of 78** (`prop_ltvl_*`).
-- **Partial channel: 6 of 78** (`prop_scE_*`, `prop_embE_compose`,
+- **L-ASSOC: 3 of 85** (`prop_lassoc_*`); **L-UNIT: 6 of 85** (`prop_lunit_*`).
+- **L-NORM: 2 of 85** (`prop_lnorm_*`); **L-TVL: 2 of 85** (`prop_ltvl_*`).
+- **Partial channel: 6 of 85** (`prop_scE_*`, `prop_embE_compose`,
   `prop_storeE_roundtrip`, `prop_discE_*`).
+- **`elementE` contract: 7 of 85** (`prop_elementE_*`).
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,

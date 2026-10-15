@@ -101,6 +101,15 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "out of domain: Nothing" prop_elementat_outOfDomain
       , testProperty "matches elementF" prop_elementat_matchesElementF
       ]
+  , testGroup "elementE — failure-channel list focus"
+      [ testProperty "negative index: Left (NegativeIndex n)" prop_elementE_negative
+      , testProperty "index past the end: Left (PastEnd n)" prop_elementE_pastEnd
+      , testProperty "in bounds: split returns the segments" prop_elementE_inBounds
+      , testProperty "GP on the success domain" prop_elementE_lgp
+      , testProperty "PG after a successful write" prop_elementE_lpg
+      , testProperty "PP after a successful write" prop_elementE_lpp
+      , testProperty "agrees with elementF on its domain" prop_elementE_matchesElementF
+      ]
   , testGroup "L-NORM — canonical form (ROADMAP 0e)"
       [ testProperty "toVL (normalize f) = toVL f" prop_lnorm_toVL
       , testProperty "overFocal (normalize c) = overFocal c" prop_lnorm_overFocal
@@ -884,6 +893,68 @@ prop_discE_uncondOVF =
   let p = limitedE 10
   in overE p (const 2) 0
        /= (overE p (const (-1)) 0 >>= overE p (const 2))
+
+--------------------------------------------------------------------
+-- elementE — failure-channel list focus
+--------------------------------------------------------------------
+
+prop_elementE_negative :: [Int] -> Bool
+prop_elementE_negative xs =
+  splitE (elementE (-1)) xs
+    == (Left (NegativeIndex (-1)) :: Either ListError (Int, ([Int], [Int])))
+
+prop_elementE_pastEnd :: [Int] -> Bool
+prop_elementE_pastEnd xs =
+  splitE (elementE (length xs)) xs
+    == (Left (PastEnd (length xs)) :: Either ListError (Int, ([Int], [Int])))
+
+prop_elementE_inBounds :: [Int] -> NonNegative Int -> Property
+prop_elementE_inBounds xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case splitAt i xs of
+         (l, x : r) -> splitE (elementE i) xs === Right (x, (l, r))
+         _          -> property False
+
+prop_elementE_lgp :: [Int] -> NonNegative Int -> Property
+prop_elementE_lgp xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case splitE (elementE i) xs of
+         Left _       -> property False
+         Right (a, c) -> plugE (elementE i) c a === Right xs
+
+prop_elementE_lpg :: [Int] -> NonNegative Int -> Int -> Property
+prop_elementE_lpg xs nn b =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case splitE (elementE i) xs of
+         Left _       -> property False
+         Right (_, c) -> case plugE (elementE i) c b of
+           Left _        -> property True
+           Right t       -> case splitE (elementE i) t of
+             Right (a', _) -> a' === b
+             Left _        -> property False
+
+prop_elementE_lpp :: [Int] -> NonNegative Int -> Int -> Int -> Property
+prop_elementE_lpp xs nn b1 b2 =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case splitE (elementE i) xs of
+         Left _       -> property False
+         Right (_, c) -> case plugE (elementE i) c b1 of
+           Left _          -> property True
+           Right t         -> case splitE (elementE i) t of
+             Left _        -> property False
+             Right (_, c') -> plugE (elementE i) c' b2 === plugE (elementE i) c b2
+
+prop_elementE_matchesElementF :: [Int] -> NonNegative Int -> Property
+prop_elementE_matchesElementF xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case elementF i of
+         Nothing -> property False
+         Just f  -> overE (elementE i) (+1) xs === Right (overF f (+1) xs)
 
 --------------------------------------------------------------------
 -- QuickCheck generators

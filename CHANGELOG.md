@@ -30,5 +30,9 @@ and this project adheres to the
   composition, success-premise laws, partial Store reading. Test suite: 78
   law-id-tagged properties.
 
+- Added `elementE` (`Focal.List.ListError`: `NegativeIndex`/`PastEnd`): the
+  failure-channel list focus (per-call index check; total plug). Suite at 85
+  properties; docs counts updated.
+
 ## 0.1.0.0 - YYYY-MM-DD
 

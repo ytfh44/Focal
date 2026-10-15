@@ -12,12 +12,15 @@ module Focal.List
   ( ListCtx
   , elementF
   , elementAt
+  , elementE
   , unsafeElementF
+  , ListError(..)
   ) where
 
 import GHC.Stack (HasCallStack)
 
 import Focal.Core (Focusing(..))
+import Focal.Partial (FocusingE(..))
 
 -- | Context for a list element focus: the elements before and after.
 --
@@ -87,3 +90,31 @@ unsafeElementF n
                [] -> error $ "unsafeElementF: index " ++ show n ++ " out of bounds (length " ++ show (length xs) ++ ")"
       , plugF = \(left, right) y -> left ++ [y] ++ right
       }
+
+-- | Failure channel for the list focus.
+data ListError
+  = NegativeIndex Int   -- ^ the index passed to 'elementE' was negative
+  | PastEnd Int         -- ^ the index is past the end of the supplied list
+  deriving (Eq, Show)
+
+-- | Failure-channel list focus: the index check runs at every 'splitE'
+--   against the supplied list; 'plugE' is total. Input-invariant on all lists.
+--
+--   >>> import Focal.Partial (overE, splitE)
+--   >>> overE (elementE 1) (*10) [1,2,3]
+--   Right [1,20,3]
+--
+--   >>> splitE (elementE 9) [1,2,3]
+--   Left (PastEnd 9)
+--
+--   >>> splitE (elementE (-1)) [1,2,3]
+--   Left (NegativeIndex (-1))
+elementE :: Int -> FocusingE ListError (ListCtx a) [a] [a] a a
+elementE n = FocusingE
+  { splitE = \xs -> if n < 0
+                      then Left (NegativeIndex n)
+                      else case splitAt n xs of
+                             (l, x : r) -> Right (x, (l, r))
+                             _          -> Left (PastEnd n)
+  , plugE  = \(l, r) b -> Right (l ++ [b] ++ r)
+  }
