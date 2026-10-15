@@ -132,15 +132,15 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 12 of 43: `prop_a1_*` (8), `prop_a2_*` (3, restatements — see conformance), `prop_xb_fromZip_roundtrip` (1) |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | **gap** → ROADMAP 0b (no property asserts it today) |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | **gap** → ROADMAP 0b |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | `prop_xd_sameFocus_overwrite` — narrow: one instance (`unsafeElementF` on lists), fixed pair `(+1) ∘ (*2)`; broaden in ROADMAP 0b |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | `prop_a3_idChain`, `prop_a3_tupleChain`, `prop_a3_listTupleChain` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | `prop_a4_leftId_*`, `prop_a4_rightId_*` (6) |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | Planned `Focal.Interop` (ROADMAP 0e) | **gap** → 0e |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | Planned `Focal.Interop` (ROADMAP 0e) | **gap** → 0e |
-| definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | `prop_a3_plugLaw` — a definitional re-check; passes by unfolding, not evidence |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 8 of 64: `prop_lgp_*` |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 7 of 64: `prop_lpg_*` |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 5 of 64: `prop_lpp_*` (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 4 of 64: `prop_lovf_*` (four instances, arbitrary function pairs) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 64: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 64: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 64: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 64: `prop_ltvl_*` |
+| definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
 re-split focus `a' = g1 a`, using `(a, c) = splitF f s`), then applies PP with
@@ -168,18 +168,17 @@ Every throw site is registered below and in `conformance.md`:
 | `elementF`'s `splitF` | outside `0 <= n < length xs` | delayed `error` ("precondition violated") |
 | `unsafeElementF`, construction | `n < 0` | immediate `error` |
 | `unsafeElementF`'s `splitF` | `n >= length xs` | delayed `error` |
-| `unsafeFocusAt`, construction | path absent in the supplied tree | `error` before any `Focusing` is built |
+| `focusAt`'s `splitF` | path absent in the supplied tree (the construction tree is checked separately, returning `Nothing`) | delayed `error` |
 
 ### 4.2 Input invariance
 
 `splitF f s` may depend on `s` and on nothing else — not on external state, not
 on a residual or focus captured at construction time.
 
-**Exemption (must be named):** the snapshot constructors `fromZip`,
-`safeFocusAt`, and `unsafeFocusAt` ignore their argument by construction. They
-are exempt and are marked as such in `conformance.md`. Consequences: for those
-instances GP holds only for the tree the snapshot was taken from, and PG fails
-in general.
+**Exemption (must be named):** the snapshot constructor `fromZip` ignores its
+argument by construction. It is exempt and is marked as such in
+`conformance.md`. Consequences: for this instance GP holds only for the tree
+the snapshot was taken from, and PG fails in general.
 
 ### 4.3 Claim discipline
 
@@ -192,8 +191,8 @@ Claims that cannot be so mapped are defects, not documentation.
 Four equivalent readings of a `Focusing`, each with its own premise:
 
 1. **CPS closure.** Packing the residual as an existential is the CPS form:
-   `∃C. P(C) ≅ ∀R. (∀C. P(C) → R) → R` — this is what `mkFocal` / `withFocal`
-   (ROADMAP 0e) expose.
+   `∃C. P(C) ≅ ∀R. (∀C. P(C) → R) → R` — exposed as `mkFocal` / `withFocal`
+   (shipped).
 2. **Coend / co-Yoneda.** The existential pair of a decomposition and a rebuild
    is a coend:
    `∫^C Hom(S, A×C) × Hom(C×B, T) ≅ S → (A × (B → T))` — the `Focal` packaging
@@ -201,7 +200,8 @@ Four equivalent readings of a `Focusing`, each with its own premise:
 3. **Van Laarhoven form.** For the mono lawful case, the same data is
    `≅ ∀F. Functor F ⇒ (A → F B) → S → F T`; the interpretation formula is
    `\k s -> fmap (plugF f c) (k a)` where `(a, c) = splitF f s`. This is what
-   `overFM` implements, and why only `Functor` is required.
+   `overFM` implements (and `Focal.Interop.toVL`), and why only `Functor` is
+   required.
 4. **Extensional-only laws.** Laws stated on `Focal` (`L-NORM`, `L-TVL`) hold
    only extensionally, because of item 1.
 

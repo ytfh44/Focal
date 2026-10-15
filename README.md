@@ -26,9 +26,9 @@ The library currently ships with a proof-of-concept set: Lens-like focusing, pos
 | **Package** | `Focal` |
 | **Version** | `0.1.0.0` |
 | **License** | BSD-3-Clause |
-| **Compiler** | GHC ≥ 9.0, Haskell Stack |
-| **Dependencies** | `base >= 4.7 && < 5` |
-| **Tests** | Tasty + QuickCheck (zipper round-trips, composition laws, concrete examples); classification in [docs/conformance.md](docs/conformance.md) |
+| **Compiler** | GHC ≥ 9.2, Haskell Stack |
+| **Dependencies** | `base >= 4.16 && < 5` |
+| **Tests** | Tasty + QuickCheck (zipper round-trips, composition laws, concrete examples); doctest gate included; classification in [docs/conformance.md](docs/conformance.md) |
 
 ---
 
@@ -60,7 +60,7 @@ pureF :: (s -> a) -> (s -> b -> t) -> Focusing s s t a b
 -- Under the hood: splitF s = (view s, s); plugF s b = set s b
 ```
 
-`fstF` and `sndF` are concrete instances for pairs. The shipped interop surface with `lens`/`optics` is `toStoreLike`, which projects a `Focusing` into a Store-like `(a, b -> t)`. Full Van Laarhoven conversions (`toVL`/`fromVL`) are scheduled (ROADMAP 0e) and would hold extensionally only — see [docs/foundation.md](docs/foundation.md) §5.
+`fstF` and `sndF` are concrete instances for pairs. The shipped interop surface with `lens`/`optics` is `toStoreLike`, which projects a `Focusing` into a Store-like `(a, b -> t)`; the Van Laarhoven conversions (`toVL`/`fromVL`) ship in `Focal.Interop` and hold extensionally only — see [docs/foundation.md](docs/foundation.md) §5.
 
 ### 2. Positional list focus (`Focal.List`)
 
@@ -124,20 +124,20 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 | Level | What it is | Enforced by | Witness |
 |---|---|---|---|
 | **L0** | Structure facts (`Focusing` signatures; public constructor) | The type system | Signature inspection |
-| **L1** | Axiom **A-LENS** (GP ∧ PG ∧ PP) | Assumption per instance | L-GP family; PG/PP gaps — see conformance |
+| **L1** | Axiom **A-LENS** (GP ∧ PG ∧ PP) | Assumption per instance | L-GP / L-PG / L-PP families — see conformance |
 | **L2** | Definitional identities (`idF`; `composeF` plug law) | Definition | Definitional (no failure mode) |
 | **L3** | Corollaries (occurrence ≠ value; associativity/unit modulo residual reassociation) | Derivation | L-ASSOC / L-UNIT families |
 | **L4** | Representation theorems (CPS, coend/co-Yoneda, Van Laarhoven form) | Cited proofs + premises | Paper proofs — [docs/foundation.md](docs/foundation.md) §5 |
 | **L5** | Contracts (domains, failure modes, input invariance) | Documentation + conformance matrix | [docs/conformance.md](docs/conformance.md) |
 | **L6** | Engineering constraints (scope and process) | Review / CI | [ROADMAP.md](ROADMAP.md) §0 |
 
-**Test families.** `XB` (navigation & path tests) and `XD` (edit-survival tests) run in `test/Spec.hs`; per-instance verdicts are in the conformance matrix.
+**Test families.** The suite is law-id tagged — `L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`, `L-UNIT`, `L-NORM`, `L-TVL` — plus contract (`focusAt`, `elementAt`, snapshot contracts, discriminators), navigation, and regression groups; per-instance witnesses are listed in the conformance matrix.
 
 **Boundary notes.** `XA` (type endpoints): deferred — requires indexed GADTs. `XC` (navigation normalization): decidable-child assumption not formalized. `XE` (sharing boundary): occurrence focus ≠ vertex focus for DAGs — documented boundary. `XF` (strategy externalization): no strategy in `plugF`, by design. `XG` (computability witness): `ZipTree` child selection defaults to `Int`; not yet exposed.
 
 ### Coverage
 
-The test suite has **43 QuickCheck properties**; their classification and gaps are tracked in [docs/conformance.md](docs/conformance.md) — currently **no property directly asserts L-PG or L-PP**, and L-OVF has a single narrow instance witness.
+The test suite has **64 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 
@@ -186,7 +186,7 @@ These map cleanly onto `Focusing` without adding new conceptual machinery. The r
 | 4 | **Typed Syntax** | Indexed stack `Stack j i` | Sort-checked rebuild | ❌ |
 | 5 | **Redex / Evaluation** | Evaluation context | Contraction strategy | ❌ † |
 
-*† Row 5 needs an extended rung (`FocusingE`/`FocusingM`) — not an instance of the `Focusing` core as shipped. ‡ `fromZip` (and `safeFocusAt`/`unsafeFocusAt`) are snapshot constructors: `splitF` ignores its argument — see [docs/foundation.md](docs/foundation.md) §4.2.*
+*† Row 5 needs an extended rung (`FocusingE`/`FocusingM`) — not an instance of the `Focusing` core as shipped. ‡ `fromZip` is a snapshot constructor: `splitF` ignores its argument — see [docs/foundation.md](docs/foundation.md) §4.2; by-path focus is the dynamic `focusAt`.*
 
 - **Typed Syntax Focal** (4) is the indexed version: the residual carries both the tree path and the endpoint sorts, so a replacement with the wrong sort is a type error, not a runtime failure. It requires GADTs and type-level path tracking, which is why it's not in the initial release — but it is a natural extension of `Focal.Zipper`.
 
@@ -287,11 +287,11 @@ overF deep show ((42, "x"), True)  -- → (("42", "x"), True)
 overFM fstF (\x -> putStrLn ("Got: " ++ show x) >> pure (x + 1)) (41, "ok")
 -- prints "Got: 41", returns (42, "ok")
 
--- Zipper (binary tree). Snapshot semantics: splitF ignores its argument, and
--- Nothing covers only the path check against t (see docs/foundation.md §4).
+-- Zipper (binary tree). `focusAt` re-navigates the supplied tree on every
+-- split, so the focus is the one at `path` in whichever tree you apply it to.
 import Focal.Zipper
 let t  = Node (Node (Leaf 1) (Leaf 2)) (Leaf 3)
-    Just f = safeFocusAt [GoLeft, GoRight] t
+    Just f = focusAt [GoLeft, GoRight] t
 overF f (*10) t  -- multiplies the right child of the left subtree by 10
 ```
 

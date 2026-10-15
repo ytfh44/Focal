@@ -11,6 +11,7 @@ import Focal.Core (Focusing(..))
 -- | Focus on the first element of a pair.
 --   The residual is the second element, preserved unchanged.
 --
+--   >>> import Focal.Core (overF)
 --   >>> overF fstF show (42 :: Int, "hi")
 --   ("42","hi")
 --
@@ -25,6 +26,7 @@ fstF = Focusing
 -- | Focus on the second element of a pair.
 --   The residual is the first element, preserved unchanged.
 --
+--   >>> import Focal.Core (overF)
 --   >>> overF sndF show ("hi", 42 :: Int)
 --   ("hi","42")
 --

@@ -30,22 +30,23 @@ Standing constraints — checked at every review; they have no completion state.
 Depends on: —. Done = ① documents merged ② build and tests green ③ the retired-phrase audit described in `docs/foundation.md` §6 stays clean. [x]
 
 0b. Rewrite tests by law-id: drop duplicates and definitional entries; add witnesses for L-PG and L-PP (none exist today); broaden L-OVF coverage beyond its single fixed-pair instance; add snapshot-contract tests for `fromZip`; annotate every property with its law-id.
-Depends on: 0a. Done = ① every conformance row claiming L-PG/L-PP has a green witness ② conformance matrix updated ③ no property name overstates what it checks.
+Depends on: 0a. Done = ① every conformance row claiming L-PG/L-PP has a green witness ② conformance matrix updated ③ no property name overstates what it checks. [x]
 
 0c. List contract fixes: add `elementAt` (construction-time bounds check; total for `0 <= n < length` via `Maybe`/`Either`); turn the `Focal.List` haddock examples into genuinely runnable doctests; keep the deferred-error behavior of `elementF`/`unsafeElementF` documented.
-Depends on: 0a. Done = ① `elementAt` implemented with tests ② doctests runnable ③ haddock matches behavior.
+Depends on: 0a. Done = ① `elementAt` implemented with tests ② doctests runnable ③ haddock matches behavior. [x]
 
 0d. Zipper semantics split: keep `fromZip` as snapshot semantics (documented); add a dynamic `focusAt :: [Child t] -> t -> Maybe (Focusing ...)` that is input-invariant on its valid domain and reports invalid paths through the return channel; decide retire-vs-rename for `safeFocusAt`/`unsafeFocusAt` in this item.
-Depends on: 0a. Done = ① decision recorded ② dynamic `focusAt` implemented with tests ③ conformance rows updated.
+Depends on: 0a. Done = ① decision recorded ② dynamic `focusAt` implemented with tests ③ conformance rows updated. [x]
+Decision recorded 2026-10-15: `safeFocusAt` / `unsafeFocusAt` were retired in favor of `fromZip` (snapshot) + `focusAt` (dynamic); `focusAt` validates the path against the construction tree and re-navigates per input.
 
 0e. Land the representation ladder: `Focal` encapsulation decision + `mkFocal`/`withFocal`; `normalize`; `Focal.Interop` (`PStore`/`reifyVL`/`toVL`/`fromVL`); L-NORM / L-TVL tests.
-Depends on: 0a. Done = ① conversions implemented and tested extensionally ② L-NORM/L-TVL rows green.
+Depends on: 0a. Done = ① conversions implemented and tested extensionally ② L-NORM/L-TVL rows green. [x]
 
 0f. Promote `Focal.Laws`: extract the shared law combinators once a second in-repo consumer exists.
 Depends on: 0b, 0e. Done = ① ≥ 2 in-repo consumers of the shared combinators.
 
 0g. Enforcement: doctest gate in CI; law-id-tagged property output.
-Depends on: 0b, 0c. Done = ① CI fails on failing doctests ② test output prints law-id labels.
+Depends on: 0b, 0c. Done = ① CI fails on failing doctests ② test output prints law-id labels. [x]
 
 ---
 

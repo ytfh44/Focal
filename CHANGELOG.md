@@ -15,5 +15,15 @@ and this project adheres to the
   corrected haddock/contract wording in `Focal.Core`, `Focal.List`, and
   `Focal.Zipper`. No behavior changes.
 
+- P0 execution (ROADMAP 0b–0e, 0g): added `elementAt` (construction-time checked
+  list focus); added dynamic `focusAt` and retired `safeFocusAt`/`unsafeFocusAt`;
+  hid the `Focal` constructor behind `mkFocal`/`withFocal`; added
+  `Focal.Interop` (`VLens`, `PStore`, `reifyVL`, `toVL`, `fromVL`, `normalize`);
+  rewrote the test suite as 64 law-id-tagged properties (L-PG/L-PP/L-OVF
+  witnesses added); added a doctest test-suite gate and a minimal CI workflow;
+  aligned docs, README, and roadmap. Breaking API: `Focal(..)` is now `Focal` +
+  `mkFocal`/`withFocal`; `safeFocusAt`/`unsafeFocusAt` removed; `base` bound
+  raised to `>= 4.16`.
+
 ## 0.1.0.0 - YYYY-MM-DD
 

@@ -1,9 +1,11 @@
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main (main) where
 
-import Data.Functor.Identity (Identity(..))
-import Data.List (splitAt)
+import Control.Exception (ErrorCall, evaluate, try)
+import Data.List (isInfixOf)
+import Data.Maybe (isNothing)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
@@ -11,250 +13,338 @@ import Focal.Core
 import Focal.Tuple
 import Focal.List
 import Focal.Zipper
+import Focal.Interop
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
-  [ ---------------------------------------------------------------
-    -- L-GP: Split-Plug Reconstruction (was A1)
-    --   let (a, c) = splitF f s in plugF f c a == s
-    ---------------------------------------------------------------
-    testGroup "L-GP — Split-Plug Reconstruction (was A1)"
-      [ testProperty "idF: plug original focus = s"           prop_a1_idF
-      , testProperty "fstF: plug original focus = s"          prop_a1_fstF
-      , testProperty "sndF: plug original focus = s"          prop_a1_sndF
-      , testProperty "list element: plug original focus = s"  prop_a1_list
-      , testProperty "Rose fromZip: plug original focus = s"   prop_a1_roseZip
-      , testProperty "BinTree fromZip: plug original focus = s" prop_a1_binZip
-      , testProperty "lens-like: roundtrip via pureF"         prop_a1_pureF
-      , testProperty "composed focus: plug original focus = s" prop_a1_composed
+  [ testGroup "L-GP — Split-plug reconstruction"
+      [ testProperty "idF: plug (splitF s) = s" prop_lgp_idF
+      , testProperty "fstF: plug (splitF pair) = pair" prop_lgp_fstF
+      , testProperty "sndF: plug (splitF pair) = pair" prop_lgp_sndF
+      , testProperty "elementF: plug (splitF xs) = xs" prop_lgp_list
+      , testProperty "Rose fromZip: plug (splitF t) = t" prop_lgp_roseZip
+      , testProperty "BinTree fromZip: plug (splitF t) = t" prop_lgp_binZip
+      , testProperty "pureF lawful pair: plug (splitF s) = s" prop_lgp_pureF
+      , testProperty "composed: plug (splitF pair) = pair" prop_lgp_composed
       ]
-
-  ---------------------------------------------------------------
-  -- (was A2) Restatements of L-GP.
-  --   These three properties re-assert the split-plug roundtrip; they do
-  --   not test a separate residual-legality claim (see docs/conformance.md).
-  ---------------------------------------------------------------
-  , testGroup "L-GP restatements (was A2)"
-      [ testProperty "idF residual () paired with s always restores"  prop_a2_idF
-      , testProperty "list residual depends on source length"          prop_a2_list_depends
-      , testProperty "Rose residual depends on exact source"           prop_a2_rose_depends
+  , testGroup "L-PG — Retrieve"
+      [ testProperty "idF: re-split after plug recovers b" prop_lpg_idF
+      , testProperty "fstF: re-split after plug recovers b" prop_lpg_fstF
+      , testProperty "sndF: re-split after plug recovers b" prop_lpg_sndF
+      , testProperty "userLens: re-split after plug recovers b" prop_lpg_userLens
+      , testProperty "elementF: re-split after plug recovers b" prop_lpg_elementF
+      , testProperty "unsafeElementF: re-split after plug recovers b" prop_lpg_unsafeElementF
+      , testProperty "composed: re-split after plug recovers b" prop_lpg_composed
       ]
-
-  ---------------------------------------------------------------
-  -- L-ASSOC: Composition Associativity (was A3)
-  --   (f >>> g) >>> h  ≃  f >>> (g >>> h)
-  --   Up to residual tuple reassociation: ((c1,c2),c3) ≃ (c1,(c2,c3))
-  --   (prop_a3_plugLaw re-checks the definitional plug law of composeF.)
-  ---------------------------------------------------------------
-  , testGroup "L-ASSOC — Composition Associativity (was A3)"
-      [ testProperty "idF chain: behavioural equivalence"            prop_a3_idChain
-      , testProperty "tuple chain: mixed focus type"                 prop_a3_tupleChain
-      , testProperty "list into tuple composition"                   prop_a3_listTupleChain
-      , testProperty "composition respects plug law"                 prop_a3_plugLaw
+  , testGroup "L-PP — Overwrite stability"
+      [ testProperty "idF: plug c' b2 = plug c b2" prop_lpp_idF
+      , testProperty "fstF: plug c' b2 = plug c b2" prop_lpp_fstF
+      , testProperty "userLens: plug c' b2 = plug c b2" prop_lpp_userLens
+      , testProperty "elementF: plug c' b2 = plug c b2" prop_lpp_list
+      , testProperty "fromZip: trivially stable (constant residual)" prop_lpp_fromZip
       ]
-
-  ---------------------------------------------------------------
-  -- L-UNIT: Identity Focus (was A4)
-  --   idF >>> f  ≃  f       f >>> idF  ≃  f
-  ---------------------------------------------------------------
-  , testGroup "L-UNIT — Identity Focus (was A4)"
-      [ testProperty "idF >>> fstF  ≈  fstF"              prop_a4_leftId_fst
-      , testProperty "idF >>> elementF ≈ elementF"        prop_a4_leftId_list
-      , testProperty "idF >>> fromZip ≈ fromZip"          prop_a4_leftId_zipper
-      , testProperty "fstF >>> idF ≈ fstF"                prop_a4_rightId_fst
-      , testProperty "elementF >>> idF ≈ elementF"        prop_a4_rightId_list
-      , testProperty "fromZip >>> idF ≈ fromZip"          prop_a4_rightId_zipper
+  , testGroup "L-OVF — overF homomorphism"
+      [ testProperty "fstF: overF (g . h) = overF g . overF h" prop_lovf_fstF
+      , testProperty "sndF: overF (g . h) = overF g . overF h" prop_lovf_sndF
+      , testProperty "elementF: overF (g . h) = overF g . overF h" prop_lovf_list
+      , testProperty "composed: overF (g . h) = overF g . overF h" prop_lovf_composed
       ]
-
-  ---------------------------------------------------------------
-  -- Locality (was A5) — an L0 structure fact, not an axiom.
-  --   plugF : c -> b -> t  (no Env, no IO, no global state).
-  --   Signature-level; the single property below is definitional smoke only.
-  ---------------------------------------------------------------
-  , testGroup "Locality — type fact, smoke only (was A5)"
-      [ testProperty "overFM pure = overF (no effect dependency)"   prop_a5_overFM_pure
+  , testGroup "L-ASSOC — Composition associativity"
+      [ testProperty "idF chain: behavioural equivalence" prop_lassoc_idChain
+      , testProperty "tuple chain: mixed focus type" prop_lassoc_tupleChain
+      , testProperty "list into tuple composition" prop_lassoc_listTupleChain
       ]
-
-  ---------------------------------------------------------------
-  -- Occurrence ≠ Value (was A6) — a corollary of L-GP.
-  --   focus position = (a, c), not just a.
-  --   Two different occurrences of the same value yield different residuals.
-  ---------------------------------------------------------------
-  , testGroup "Occurrence ≠ value — corollary of L-GP (was A6)"
-      [ testProperty "list: equal values at different indices"     prop_a6_list
-      , testProperty "Rose: equal subtrees at different paths"     prop_a6_rose
-      , testProperty "BinTree: equal leaves at different paths"    prop_a6_binTree
+  , testGroup "L-UNIT — Identity"
+      [ testProperty "idF >>> fstF = fstF" prop_lunit_left_fst
+      , testProperty "idF >>> elementF = elementF" prop_lunit_left_list
+      , testProperty "idF >>> fromZip = fromZip" prop_lunit_left_zipper
+      , testProperty "fstF >>> idF = fstF" prop_lunit_right_fst
+      , testProperty "elementF >>> idF = elementF" prop_lunit_right_list
+      , testProperty "fromZip >>> idF = fromZip" prop_lunit_right_zipper
       ]
-
-  ---------------------------------------------------------------
-  -- Navigation & path tests (was XB).
-  --   position -> (focus, residual)  and  (focus, residual, valid) -> position
-  --   (prop_xb_fromZip_roundtrip is an L-GP restatement for the snapshot.)
-  ---------------------------------------------------------------
-  , testGroup "Navigation & path tests (was XB)"
-      [ testProperty "Rose: safeFocusAt valid path extracts child"        prop_xb_safeFocusAt_valid
-      , testProperty "Rose: safeFocusAt invalid path = Nothing"           prop_xb_safeFocusAt_invalid
-      , testProperty "Rose: fromZip roundtrip from focused position"      prop_xb_fromZip_roundtrip
-      , testProperty "Rose: multi-level navigation preserves context"     prop_xb_multilevel
+  , testGroup "Occurrence ≠ value — corollary of L-GP"
+      [ testProperty "list: equal values at different indices" prop_occ_list
+      , testProperty "Rose: equal subtrees at different paths" prop_occ_rose
+      , testProperty "BinTree: equal leaves at different paths" prop_occ_binTree
       ]
-
-  ---------------------------------------------------------------
-  -- Edit survival tests (was XD).
-  --   On the same focus, latter overwrites former; nested edits decompose
-  --   correctly into the outer focus.
-  --   prop_xd_sameFocus_overwrite is a narrow L-OVF instance
-  --   (fixed function pair; see docs/conformance.md).
-  ---------------------------------------------------------------
-  , testGroup "Edit survival tests (was XD)"
-      [ testProperty "same-focus edits compose via overF"           prop_xd_sameFocus_overwrite
-      , testProperty "nested edit decomposes correctly"             prop_xd_nestedEdit
-      , testProperty "independent foci commute"                     prop_xd_independentFoci
+  , testGroup "ZipTree law & navigation"
+      [ testProperty "Rose: ascend frame (descend c t) = t" prop_zip_roseRoundtrip
+      , testProperty "BinTree: ascend frame (descend c t) = t" prop_zip_binRoundtrip
+      , testProperty "Rose: up (down c z) preserves current" prop_zip_updown
+      , testProperty "Rose: up (rootZip t) = Nothing" prop_zip_rootUp
+      , testProperty "Rose: multi-level navigation preserves context" prop_zip_multilevel
       ]
-
-  ---------------------------------------------------------------
-  -- Zipper: Descend/Ascend roundtrip (ZipTree law)
-  ---------------------------------------------------------------
-  , testGroup "Zipper — Descend/Ascend roundtrip"
-      [ testProperty "Rose: ascend frame (descend child t) == t"    prop_rose_roundtrip
-      , testProperty "BinTree: ascend frame (descend child t) == t" prop_bintree_roundtrip
+  , testGroup "Snapshot contracts (fromZip)"
+      [ testProperty "fromZip: splitF ignores the input tree" prop_contract_zip_ignoresInput
+      , testProperty "fromZip: re-split returns the captured focus" prop_contract_zip_pgCaptured
       ]
-
-  ---------------------------------------------------------------
-  -- Zipper: Navigation roundtrip
-  ---------------------------------------------------------------
-  , testGroup "Zipper — Navigation roundtrip"
-      [ testProperty "Rose: up (down child z) preserves current"    prop_rose_updown
-      , testProperty "Rose: rootZip >> up = Nothing"                prop_rose_rootUp
+  , testGroup "Law discriminators — unlawful pureF pairs"
+      [ testProperty "unlawful view: GP fails" prop_disc_pureF_gp
+      , testProperty "unlawful set: PG fails" prop_disc_pureF_pg
       ]
-
-  ---------------------------------------------------------------
-  -- Concrete Examples (regression)
-  ---------------------------------------------------------------
-  , testGroup "Concrete Examples"
-      [ testProperty "overF fstF show (42, \"hello\")"    prop_concrete_tuple
+  , testGroup "focusAt — dynamic zipper focus"
+      [ testProperty "valid path extracts the child" prop_focusat_valid
+      , testProperty "input-invariant: focus follows the supplied tree" prop_focusat_inputInvariant
+      , testProperty "GP on the declared domain" prop_focusat_gp
+      , testProperty "PG on the declared domain" prop_focusat_pg
+      , testProperty "PP on the declared domain" prop_focusat_pp
+      , testProperty "missing selector: Nothing" prop_focusat_missingSelector
+      , testProperty "no children: Nothing" prop_focusat_noChildren
+      , testProperty "path absent in a later tree: deferred error" prop_focusat_deferredError
+      ]
+  , testGroup "elementAt — checked list focus"
+      [ testProperty "total on its domain: update at the index" prop_elementat_total
+      , testProperty "out of domain: Nothing" prop_elementat_outOfDomain
+      , testProperty "matches elementF" prop_elementat_matchesElementF
+      ]
+  , testGroup "L-NORM — canonical form (ROADMAP 0e)"
+      [ testProperty "toVL (normalize f) = toVL f" prop_lnorm_toVL
+      , testProperty "overFocal (normalize c) = overFocal c" prop_lnorm_overFocal
+      ]
+  , testGroup "L-TVL — toVL composition (ROADMAP 0e)"
+      [ testProperty "composed list focus" prop_ltvl_composedList
+      , testProperty "composed fst/fst focus" prop_ltvl_fstFst
+      ]
+  , testGroup "Concrete examples (regression)"
+      [ testProperty "overF fstF show (42, \"hello\")" prop_concrete_tuple
       , testProperty "overF (unsafeElementF 1) (*10) [1,2,3]" prop_concrete_list
       ]
-
-  ---------------------------------------------------------------
-  -- Tuple & List Update Preservation (regression)
-  ---------------------------------------------------------------
-  , testGroup "Tuple & List Update"
-      [ testProperty "fstF: update preserves snd"             prop_fstF_update
-      , testProperty "sndF: update preserves fst"             prop_sndF_update
-      , testProperty "elementF: negative index = Nothing"     prop_listElement_negative
-      , testProperty "unsafeElementF: update first element"    prop_listElement_update
-      , testProperty "unsafeElementF: update random element"   prop_listElement_update_random
+  , testGroup "elementF contract"
+      [ testProperty "negative index: Nothing" prop_elementf_negative
+      ]
+  , testGroup "Edit independence (observation)"
+      [ testProperty "independent foci commute" prop_obs_independentFoci
       ]
   ]
 
 --------------------------------------------------------------------
--- L-GP: Split-Plug Reconstruction (was A1)
+-- Shared definitions
 --------------------------------------------------------------------
 
-prop_a1_idF :: Int -> Bool
-prop_a1_idF s =
+data User = User { userFirst :: String, userLast :: String }
+  deriving (Eq, Show)
+
+-- | Non-trivial lawful lens (record update), for the conditional-obligation tests.
+userLens :: Focusing User User User String String
+userLens = fromLensLike userFirst (\u v -> u { userFirst = v })
+
+-- | Unlawful pairs (deliberate), used by the discriminator tests.
+badSetLens :: Focusing User User User String String
+badSetLens = fromLensLike userFirst (\u _ -> u)
+
+badViewLens :: Focusing User User User String String
+badViewLens = fromLensLike (const "") (\u v -> u { userFirst = v })
+
+-- | Index into a non-empty list, drawn from a generated @NonNegative@.
+listIndex :: [Int] -> NonNegative Int -> Int
+listIndex xs (NonNegative n) = n `mod` length xs
+
+--------------------------------------------------------------------
+-- L-GP — Split-plug reconstruction
+--   let (a, c) = splitF f s in plugF f c a == s
+--------------------------------------------------------------------
+
+prop_lgp_idF :: Int -> Bool
+prop_lgp_idF s =
   let (focus, ctx) = splitF idF s
   in plugF idF ctx focus == s
 
-prop_a1_fstF :: (Int, Int) -> Bool
-prop_a1_fstF pair =
+prop_lgp_fstF :: (Int, Int) -> Bool
+prop_lgp_fstF pair =
   let (focus, ctx) = splitF fstF pair
   in plugF fstF ctx focus == pair
 
-prop_a1_sndF :: (Int, Int) -> Bool
-prop_a1_sndF pair =
+prop_lgp_sndF :: (Int, Int) -> Bool
+prop_lgp_sndF pair =
   let (focus, ctx) = splitF sndF pair
   in plugF sndF ctx focus == pair
 
-prop_a1_list :: [Int] -> NonNegative Int -> Property
-prop_a1_list xs (NonNegative n) =
+prop_lgp_list :: [Int] -> NonNegative Int -> Property
+prop_lgp_list xs (NonNegative n) =
   not (null xs) ==> do
     let i = n `mod` length xs
         f = unsafeElementF i
         (focus, ctx) = splitF f xs
     plugF f ctx focus === xs
 
-prop_a1_roseZip :: Rose Int -> Property
-prop_a1_roseZip t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just z  = down (0 :: Int) (rootZip t)
-        f       = fromZip z
-        (focus, ctx) = splitF f t
-    plugF f ctx focus === t
+prop_lgp_roseZip :: Rose Int -> Property
+prop_lgp_roseZip t@(Rose _ kids) =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        let f = fromZip z
+            (focus, ctx) = splitF f t
+        in plugF f ctx focus === t
 
-prop_a1_binZip :: BinTree Int -> Property
-prop_a1_binZip t@(Node _ _) = do
-  let Just z  = down GoLeft (rootZip t)
-      f       = fromZip z
-      (focus, ctx) = splitF f t
-  plugF f ctx focus === t
-prop_a1_binZip Leaf{} = property True
+prop_lgp_binZip :: BinTree Int -> Property
+prop_lgp_binZip t@(Node _ _) =
+  case down GoLeft (rootZip t) of
+    Nothing -> property False
+    Just z ->
+      let f = fromZip z
+          (focus, ctx) = splitF f t
+      in plugF f ctx focus === t
+prop_lgp_binZip Leaf{} = property True
 
-prop_a1_pureF :: Int -> Bool
-prop_a1_pureF s =
+prop_lgp_pureF :: Int -> Bool
+prop_lgp_pureF s =
   let f = pureF id (\_ b -> b)
       (focus, ctx) = splitF f s
   in plugF f ctx focus == s
 
-prop_a1_composed :: ([Int], String) -> Property
-prop_a1_composed pair =
+prop_lgp_composed :: ([Int], String) -> Property
+prop_lgp_composed pair =
   not (null (fst pair)) ==> do
-    let f   = fstF >>> unsafeElementF 0
+    let f = fstF >>> unsafeElementF 0
         (focus, ctx) = splitF f pair
     plugF f ctx focus === pair
 
 --------------------------------------------------------------------
--- (was A2) L-GP restatements
+-- L-PG — Retrieve
+--   let c = snd (splitF f s) in fst (splitF f (plugF f c b)) == b
 --------------------------------------------------------------------
 
-prop_a2_idF :: Int -> Bool
-prop_a2_idF s =
-  let (_, ctx) = splitF idF s
-      (focus', _) = splitF idF (s + 1)
-  in plugF idF ctx focus' == s + 1
+prop_lpg_idF :: Int -> Int -> Bool
+prop_lpg_idF s b =
+  let c = snd (splitF idF s)
+  in fst (splitF idF (plugF idF c b)) == b
 
-prop_a2_list_depends :: [Int] -> NonNegative Int -> Property
-prop_a2_list_depends xs (NonNegative n) =
-  not (null xs) ==> do
-    let i = n `mod` length xs
-        f = unsafeElementF i
-        (focus, ctx) = splitF f xs
-    plugF f ctx focus === xs
+prop_lpg_fstF :: (Int, Int) -> Int -> Bool
+prop_lpg_fstF p x =
+  let c = snd (splitF fstF p)
+  in fst (splitF fstF (plugF fstF c x)) == x
 
-prop_a2_rose_depends :: Rose Int -> Property
-prop_a2_rose_depends t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just z  = down (0 :: Int) (rootZip t)
-        f       = fromZip z
-        (focus', ctx) = splitF f t
-    plugF f ctx focus' === t
+prop_lpg_sndF :: (Int, Int) -> Int -> Bool
+prop_lpg_sndF p x =
+  let c = snd (splitF sndF p)
+  in fst (splitF sndF (plugF sndF c x)) == x
+
+prop_lpg_userLens :: String -> String -> String -> Bool
+prop_lpg_userLens f0 l0 b =
+  let u = User f0 l0
+      c = snd (splitF userLens u)
+  in fst (splitF userLens (plugF userLens c b)) == b
+
+prop_lpg_elementF :: [Int] -> NonNegative Int -> Int -> Property
+prop_lpg_elementF xs nn b =
+  not (null xs) ==>
+    case elementF (listIndex xs nn) of
+      Nothing -> property False
+      Just f ->
+        let c = snd (splitF f xs)
+        in fst (splitF f (plugF f c b)) === b
+
+prop_lpg_unsafeElementF :: [Int] -> NonNegative Int -> Int -> Property
+prop_lpg_unsafeElementF xs nn b =
+  not (null xs) ==>
+    let f = unsafeElementF (listIndex xs nn)
+        c = snd (splitF f xs)
+    in fst (splitF f (plugF f c b)) === b
+
+prop_lpg_composed :: ([Int], String) -> Int -> Property
+prop_lpg_composed pair b =
+  not (null (fst pair)) ==>
+    let f = fstF >>> unsafeElementF 0
+        c = snd (splitF f pair)
+    in fst (splitF f (plugF f c b)) === b
 
 --------------------------------------------------------------------
--- L-ASSOC: Composition Associativity (was A3)
+-- L-PP — Overwrite stability
+--   plugF f (snd (splitF f (plugF f c b1))) b2 == plugF f c b2
 --------------------------------------------------------------------
 
-prop_a3_idChain :: Int -> Bool
-prop_a3_idChain s =
+prop_lpp_idF :: Int -> Int -> Int -> Bool
+prop_lpp_idF s b1 b2 =
+  let c = snd (splitF idF s)
+      (_, c') = splitF idF (plugF idF c b1)
+  in plugF idF c' b2 == plugF idF c b2
+
+prop_lpp_fstF :: (Int, Int) -> Int -> Int -> Bool
+prop_lpp_fstF p b1 b2 =
+  let c = snd (splitF fstF p)
+      (_, c') = splitF fstF (plugF fstF c b1)
+  in plugF fstF c' b2 == plugF fstF c b2
+
+prop_lpp_userLens :: String -> String -> String -> String -> Bool
+prop_lpp_userLens f0 l0 b1 b2 =
+  let u = User f0 l0
+      c = snd (splitF userLens u)
+      (_, c') = splitF userLens (plugF userLens c b1)
+  in plugF userLens c' b2 == plugF userLens c b2
+
+prop_lpp_list :: [Int] -> NonNegative Int -> Int -> Int -> Property
+prop_lpp_list xs nn b1 b2 =
+  not (null xs) ==>
+    let f = unsafeElementF (listIndex xs nn)
+        c = snd (splitF f xs)
+        (_, c') = splitF f (plugF f c b1)
+    in plugF f c' b2 === plugF f c b2
+
+prop_lpp_fromZip :: Rose Int -> Rose Int -> Rose Int -> Property
+prop_lpp_fromZip t@(Rose _ kids) b1 b2 =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        -- Trivial here: the snapshot residual is constant, so a re-split
+        -- after plugging returns the same captured context (docs/conformance.md).
+        let f = fromZip z
+            c = snd (splitF f t)
+            (_, c') = splitF f (plugF f c b1)
+        in plugF f c' b2 === plugF f c b2
+
+--------------------------------------------------------------------
+-- L-OVF — overF homomorphism
+--   overF f (g . h) s == overF f g (overF f h s)
+--------------------------------------------------------------------
+
+prop_lovf_fstF :: (Int, Int) -> Fun Int Int -> Fun Int Int -> Property
+prop_lovf_fstF pair g h =
+  overF fstF (applyFun g . applyFun h) pair
+    === overF fstF (applyFun g) (overF fstF (applyFun h) pair)
+
+prop_lovf_sndF :: (Int, Int) -> Fun Int Int -> Fun Int Int -> Property
+prop_lovf_sndF pair g h =
+  overF sndF (applyFun g . applyFun h) pair
+    === overF sndF (applyFun g) (overF sndF (applyFun h) pair)
+
+prop_lovf_list :: [Int] -> NonNegative Int -> Fun Int Int -> Fun Int Int -> Property
+prop_lovf_list xs nn g h =
+  not (null xs) ==>
+    let f = unsafeElementF (listIndex xs nn)
+    in overF f (applyFun g . applyFun h) xs
+         === overF f (applyFun g) (overF f (applyFun h) xs)
+
+prop_lovf_composed :: ([Int], String) -> Fun Int Int -> Fun Int Int -> Property
+prop_lovf_composed pair g h =
+  not (null (fst pair)) ==>
+    let f = fstF >>> unsafeElementF 0
+    in overF f (applyFun g . applyFun h) pair
+         === overF f (applyFun g) (overF f (applyFun h) pair)
+
+--------------------------------------------------------------------
+-- L-ASSOC — Composition associativity
+--------------------------------------------------------------------
+
+prop_lassoc_idChain :: Int -> Bool
+prop_lassoc_idChain s =
   let left  = (idF >>> idF) >>> idF
       right = idF >>> (idF >>> idF)
   in overF left id s == overF right id s
 
-prop_a3_tupleChain :: (((Int, Int), String), Bool) -> Bool
-prop_a3_tupleChain v =
+prop_lassoc_tupleChain :: (((Int, Int), String), Bool) -> Bool
+prop_lassoc_tupleChain v =
   let f = fstF
-      g = fstF
-      assocL = (f >>> g) -- focuses outermost fst, then inner fst
-      assocR = (f >>> g) -- trivially same since idF not in chain
-      -- Test: compose idF as an extra layer
       left  = (idF >>> f) >>> fstF
       right = idF >>> (f >>> fstF)
   in overF left id v == overF right id v
 
-prop_a3_listTupleChain :: ([Int], String) -> Property
-prop_a3_listTupleChain pair =
+prop_lassoc_listTupleChain :: ([Int], String) -> Property
+prop_lassoc_listTupleChain pair =
   not (null (fst pair)) ==> do
     let f = fstF
         g = unsafeElementF 0
@@ -262,75 +352,59 @@ prop_a3_listTupleChain pair =
         right = f >>> (g >>> idF)
     overF left id pair === overF right id pair
 
-prop_a3_plugLaw :: ([Int], String) -> Property
-prop_a3_plugLaw pair =
-  not (null (fst pair)) ==> do
-    let f = fstF
-        g = unsafeElementF 0
-        combined = f >>> g
-        (_, (c1, c2)) = splitF combined pair
-        y = 42
-    plugF combined (c1, c2) y === plugF f c1 (plugF g c2 y)
-
 --------------------------------------------------------------------
--- L-UNIT: Identity Focus (was A4)
+-- L-UNIT — Identity
 --------------------------------------------------------------------
 
-prop_a4_leftId_fst :: (Int, Int) -> Bool
-prop_a4_leftId_fst pair =
+prop_lunit_left_fst :: (Int, Int) -> Bool
+prop_lunit_left_fst pair =
   let f = fstF
   in overF (idF >>> f) id pair == overF f id pair
 
-prop_a4_leftId_list :: [Int] -> NonNegative Int -> Property
-prop_a4_leftId_list xs (NonNegative n) =
+prop_lunit_left_list :: [Int] -> NonNegative Int -> Property
+prop_lunit_left_list xs (NonNegative n) =
   not (null xs) ==> do
     let i = n `mod` length xs
         f = unsafeElementF i
     overF (idF >>> f) id xs === overF f id xs
 
-prop_a4_leftId_zipper :: Rose Int -> Property
-prop_a4_leftId_zipper t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just z = down (0 :: Int) (rootZip t)
-        f      = fromZip z
-    overF (idF >>> f) id t === overF f id t
+prop_lunit_left_zipper :: Rose Int -> Property
+prop_lunit_left_zipper t@(Rose _ kids) =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        let f = fromZip z
+        in overF (idF >>> f) id t === overF f id t
 
-prop_a4_rightId_fst :: (Int, Int) -> Bool
-prop_a4_rightId_fst pair =
+prop_lunit_right_fst :: (Int, Int) -> Bool
+prop_lunit_right_fst pair =
   let f = fstF
   in overF (f >>> idF) id pair == overF f id pair
 
-prop_a4_rightId_list :: [Int] -> NonNegative Int -> Property
-prop_a4_rightId_list xs (NonNegative n) =
+prop_lunit_right_list :: [Int] -> NonNegative Int -> Property
+prop_lunit_right_list xs (NonNegative n) =
   not (null xs) ==> do
     let i = n `mod` length xs
         f = unsafeElementF i
     overF (f >>> idF) id xs === overF f id xs
 
-prop_a4_rightId_zipper :: Rose Int -> Property
-prop_a4_rightId_zipper t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just z = down (0 :: Int) (rootZip t)
-        f      = fromZip z
-    overF (f >>> idF) id t === overF f id t
+prop_lunit_right_zipper :: Rose Int -> Property
+prop_lunit_right_zipper t@(Rose _ kids) =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        let f = fromZip z
+        in overF (f >>> idF) id t === overF f id t
 
 --------------------------------------------------------------------
--- Locality (was A5): L0 structure fact, definitional smoke test
+-- Occurrence ≠ value — corollary of L-GP
+--   Two different occurrences of the same value yield different residuals.
 --------------------------------------------------------------------
 
-prop_a5_overFM_pure :: [Int] -> NonNegative Int -> Property
-prop_a5_overFM_pure xs (NonNegative n) =
-  not (null xs) ==> do
-    let i = n `mod` length xs
-        f = unsafeElementF i
-    overFM f (Identity . id) xs === Identity (overF f id xs)
-
---------------------------------------------------------------------
--- Occurrence ≠ value (was A6): corollary of L-GP
---------------------------------------------------------------------
-
-prop_a6_list :: [Int] -> Property
-prop_a6_list xs =
+prop_occ_list :: [Int] -> Property
+prop_occ_list xs =
   length xs >= 2 ==> do
     let f0 = unsafeElementF 0
         f1 = unsafeElementF 1
@@ -338,8 +412,8 @@ prop_a6_list xs =
         (a1, c1) = splitF f1 xs
     property $ if a0 == a1 then c0 /= c1 else True
 
-prop_a6_rose :: Property
-prop_a6_rose =
+prop_occ_rose :: Property
+prop_occ_rose =
   forAll genRoseWithDup $ \t ->
     case safeNavigate [0] t of
       Just z0 ->
@@ -353,8 +427,8 @@ prop_a6_rose =
           Nothing -> property True
       Nothing -> property True
 
-prop_a6_binTree :: Property
-prop_a6_binTree =
+prop_occ_binTree :: Property
+prop_occ_binTree =
   forAll genBinWithDup $ \t ->
     case safeNavigate [GoLeft] t of
       Just zL ->
@@ -369,120 +443,243 @@ prop_a6_binTree =
       Nothing -> property True
 
 --------------------------------------------------------------------
--- Navigation & path tests (was XB)
+-- ZipTree law & navigation
 --------------------------------------------------------------------
 
-prop_xb_safeFocusAt_valid :: Rose Int -> Property
-prop_xb_safeFocusAt_valid t@(Rose _ kids) =
-  not (null kids) ==> do
-    case safeFocusAt [0 :: Int] t of
+prop_zip_roseRoundtrip :: Rose Int -> Property
+prop_zip_roseRoundtrip t@(Rose _ kids) =
+  not (null kids) ==>
+    case descend (0 :: Int) t of
       Nothing -> property False
-      Just f  ->
-        let (focus, _) = splitF f t
-        in focus === head kids
+      Just (child, frame) -> ascend frame child === t
 
-prop_xb_safeFocusAt_invalid :: Rose Int -> Bool
-prop_xb_safeFocusAt_invalid t =
-  case safeFocusAt [(-1 :: Int)] t of Nothing -> True; _ -> False
+prop_zip_binRoundtrip :: BinTree Int -> Property
+prop_zip_binRoundtrip t@(Node _ _) =
+  case descend GoLeft t of
+    Nothing -> property False
+    Just (child, frame) -> ascend frame child === t
+prop_zip_binRoundtrip Leaf{} = property True
 
-prop_xb_fromZip_roundtrip :: Rose Int -> Property
-prop_xb_fromZip_roundtrip t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just z       = down (0 :: Int) (rootZip t)
-        f            = fromZip z
-        (focus, ctx) = splitF f t
-    plugF f ctx focus === t
+prop_zip_updown :: Rose Int -> Property
+prop_zip_updown t@(Rose _ kids) =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z' ->
+        case up z' of
+          Nothing -> property False
+          Just z'' -> current z'' === current (rootZip t)
 
-prop_xb_multilevel :: Rose Int -> Property
-prop_xb_multilevel t@(Rose _ kids) =
-  length kids >= 2 ==> do
-    let depth0 = fromZip (rootZip t)
-    case safeNavigate [0] t of
-      Just z1@(Zip inner (grandparent:_)) ->
-        case inner of
-          Rose _ grandKids ->
-            if not (null grandKids) then
-              case safeNavigate [0, 0] t of
-                Just z2 ->
-                  let f0 = fromZip (rootZip t)
-                      f2 = fromZip z2
-                      (_, c0) = splitF f0 t
-                      (_, c2) = splitF f2 t
-                  in length c2 === length c0 + 2
-                Nothing -> property True
-            else property True
-          _ -> property True
-      _ -> property True
-
---------------------------------------------------------------------
--- Edit survival tests (was XD)
---------------------------------------------------------------------
-
-prop_xd_sameFocus_overwrite :: [Int] -> NonNegative Int -> Property
-prop_xd_sameFocus_overwrite xs (NonNegative n) =
-  not (null xs) ==> do
-    let i = n `mod` length xs
-        f = unsafeElementF i
-    overF f (+1) (overF f (*2) xs) === overF f ((+1) . (*2)) xs
-
-prop_xd_nestedEdit :: ([Int], (String, Int)) -> Property
-prop_xd_nestedEdit outer =
-  not (null (fst outer)) ==> do
-    let f = fstF >>> unsafeElementF 0
-        -- apply edit through nested focus, then same edit through direct access
-        resultNested = overF f (+1) outer
-        (xs, rest) = outer
-        resultDirect = case xs of
-                         (y:ys) -> ((y + 1) : ys, rest)
-                         []     -> outer
-    resultNested === resultDirect
-
-prop_xd_independentFoci :: ([Int], [Int]) -> Property
-prop_xd_independentFoci (xs, ys) =
-  not (null xs) && not (null ys) ==> do
-    let fLs = fstF >>> unsafeElementF 0
-        fRs = sndF >>> unsafeElementF 0
-        applyLsThenRs t = overF fLs (const 99) (overF fRs (const 77) t)
-        applyRsThenLs t = overF fRs (const 77) (overF fLs (const 99) t)
-        input = (xs, ys)
-    applyLsThenRs input === applyRsThenLs input
-
---------------------------------------------------------------------
--- Zipper: Descend/Ascend roundtrip (ZipTree law)
---------------------------------------------------------------------
-
-prop_rose_roundtrip :: Rose Int -> Property
-prop_rose_roundtrip t@(Rose _ kids) =
-  not (null kids) ==> do
-    let Just (child, frame) = descend (0 :: Int) t
-    ascend frame child === t
-
-prop_bintree_roundtrip :: BinTree Int -> Property
-prop_bintree_roundtrip t@(Node _ _) =
-  let Just (child, frame) = descend GoLeft t
-  in ascend frame child === t
-prop_bintree_roundtrip Leaf{} = property True
-
---------------------------------------------------------------------
--- Zipper: Navigation roundtrip
---------------------------------------------------------------------
-
-prop_rose_updown :: Rose Int -> Property
-prop_rose_updown t@(Rose _ kids) =
-  not (null kids) ==> do
-    let z       = rootZip t
-        Just z' = down (0 :: Int) z
-        Just z'' = up z'
-    current z'' === current z
-
-prop_rose_rootUp :: Rose Int -> Bool
-prop_rose_rootUp t =
+prop_zip_rootUp :: Rose Int -> Bool
+prop_zip_rootUp t =
   case up (rootZip t) of
     Nothing -> True
     _       -> False
 
+prop_zip_multilevel :: Rose Int -> Property
+prop_zip_multilevel t@(Rose _ kids) =
+  length kids >= 2 ==>
+    case safeNavigate [0] t of
+      Just (Zip (Rose _ grandKids) _) ->
+        if not (null grandKids)
+          then
+            case safeNavigate [0, 0] t of
+              Just z2 ->
+                let f0 = fromZip (rootZip t)
+                    f2 = fromZip z2
+                    (_, c0) = splitF f0 t
+                    (_, c2) = splitF f2 t
+                in length c2 === length c0 + 2
+              Nothing -> property True
+          else property True
+      _ -> property True
+
 --------------------------------------------------------------------
--- Concrete Examples
+-- Snapshot contracts (fromZip)
+--------------------------------------------------------------------
+
+prop_contract_zip_ignoresInput :: Rose Int -> Rose Int -> Property
+prop_contract_zip_ignoresInput t@(Rose _ kids) t' =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        let f = fromZip z
+        in conjoin
+             [ fst (splitF f t') === current z
+             , snd (splitF f t') === context z
+             ]
+
+prop_contract_zip_pgCaptured :: Rose Int -> Rose Int -> Property
+prop_contract_zip_pgCaptured t@(Rose _ kids) b =
+  not (null kids) ==>
+    case down (0 :: Int) (rootZip t) of
+      Nothing -> property False
+      Just z ->
+        let f = fromZip z
+            a = fst (splitF f t)
+            c = snd (splitF f t)
+        in fst (splitF f (plugF f c b)) === a
+
+--------------------------------------------------------------------
+-- Law discriminators — unlawful pureF pairs
+--------------------------------------------------------------------
+
+prop_disc_pureF_gp :: Bool
+prop_disc_pureF_gp =
+  let u0 = User "alice" "smith"
+      a = fst (splitF badViewLens u0)
+      c = snd (splitF badViewLens u0)
+  in plugF badViewLens c a /= u0
+
+prop_disc_pureF_pg :: Bool
+prop_disc_pureF_pg =
+  let u0 = User "alice" "smith"
+      c = snd (splitF badSetLens u0)
+  in fst (splitF badSetLens (plugF badSetLens c "bob")) /= "bob"
+
+--------------------------------------------------------------------
+-- focusAt — dynamic zipper focus
+--------------------------------------------------------------------
+
+prop_focusat_valid :: Rose Int -> Property
+prop_focusat_valid t@(Rose _ kids) =
+  not (null kids) ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property False
+      Just f ->
+        case kids of
+          (k0:_) -> fst (splitF f t) === k0
+          []     -> property False
+
+prop_focusat_inputInvariant :: Rose Int -> Rose Int -> Property
+prop_focusat_inputInvariant t1@(Rose _ kids1) t2@(Rose _ kids2) =
+  (not (null kids1) && not (null kids2)) ==>
+    case focusAt [0 :: Int] t1 of
+      Nothing -> property False
+      Just f ->
+        case kids2 of
+          (k2:_) -> fst (splitF f t2) === k2
+          []     -> property False
+
+prop_focusat_gp :: Rose Int -> Rose Int -> Property
+prop_focusat_gp t0@(Rose _ kids0) t1@(Rose _ kids1) =
+  (not (null kids0) && not (null kids1)) ==>
+    case focusAt [0 :: Int] t0 of
+      Nothing -> property False
+      Just f -> plugF f (snd (splitF f t1)) (fst (splitF f t1)) === t1
+
+prop_focusat_pg :: Rose Int -> Rose Int -> Property
+prop_focusat_pg t@(Rose _ kids) b =
+  not (null kids) ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property False
+      Just f ->
+        let c = snd (splitF f t)
+        in fst (splitF f (plugF f c b)) === b
+
+prop_focusat_pp :: Rose Int -> Rose Int -> Rose Int -> Property
+prop_focusat_pp t@(Rose _ kids) b1 b2 =
+  not (null kids) ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property False
+      Just f ->
+        let c = snd (splitF f t)
+            (_, c') = splitF f (plugF f c b1)
+        in plugF f c' b2 === plugF f c b2
+
+prop_focusat_missingSelector :: Rose Int -> Bool
+prop_focusat_missingSelector t =
+  case focusAt [(-1) :: Int] t of
+    Nothing -> True
+    _       -> False
+
+prop_focusat_noChildren :: Rose Int -> Property
+prop_focusat_noChildren t@(Rose _ kids) =
+  null kids ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property True
+      _       -> property False
+
+prop_focusat_deferredError :: Rose Int -> Property
+prop_focusat_deferredError t@(Rose _ kids) =
+  not (null kids) ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property False
+      Just f ->
+        ioProperty $ do
+          r <- try (evaluate (fst (splitF f (Rose (0 :: Int) [])))) :: IO (Either ErrorCall (Rose Int))
+          pure $ case r of
+            Left e  -> "focusAt" `isInfixOf` show e
+            Right _ -> False
+
+--------------------------------------------------------------------
+-- elementAt — checked list focus
+--------------------------------------------------------------------
+
+prop_elementat_total :: [Int] -> NonNegative Int -> Property
+prop_elementat_total xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in case elementAt i xs of
+         Nothing -> property False
+         Just f ->
+           overF f (+1) xs === take i xs ++ [xs !! i + 1] ++ drop (i + 1) xs
+
+prop_elementat_outOfDomain :: [Int] -> Bool
+prop_elementat_outOfDomain xs =
+  isNothing (elementAt (-1) xs) && isNothing (elementAt (length xs) xs)
+
+prop_elementat_matchesElementF :: [Int] -> NonNegative Int -> Property
+prop_elementat_matchesElementF xs nn =
+  not (null xs) ==>
+    let i = listIndex xs nn
+    in fmap (\f -> overF f (+1) xs) (elementAt i xs)
+         === fmap (\f -> overF f (+1) xs) (elementF i)
+
+--------------------------------------------------------------------
+-- L-NORM — canonical form (ROADMAP 0e)
+--------------------------------------------------------------------
+
+prop_lnorm_toVL :: (Int, Int) -> Fun Int Int -> Property
+prop_lnorm_toVL s g =
+  let f   = fstF :: Focusing Int (Int, Int) (Int, Int) Int Int
+      foc = mkFocal f
+      k x = Just (applyFun g x)
+  in toVL (normalize foc) k s === toVL foc k s
+
+prop_lnorm_overFocal :: ([Int], String) -> Fun Int Int -> Property
+prop_lnorm_overFocal s g =
+  not (null (fst s)) ==>
+    let outer = mkFocal (fstF :: Focusing String ([Int], String) ([Int], String) [Int] [Int])
+        inner = mkFocal (unsafeElementF 0)
+        comp  = composeFocal outer inner
+        h = applyFun g
+    in overFocal (normalize comp) h s === overFocal comp h s
+
+--------------------------------------------------------------------
+-- L-TVL — toVL composition (ROADMAP 0e)
+--------------------------------------------------------------------
+
+prop_ltvl_composedList :: ([Int], String) -> Fun Int Int -> Property
+prop_ltvl_composedList s g =
+  not (null (fst s)) ==>
+    let outer = mkFocal (fstF :: Focusing String ([Int], String) ([Int], String) [Int] [Int])
+        inner = mkFocal (unsafeElementF 0)
+        comp  = composeFocal outer inner
+        k x = Just (applyFun g x)
+    in toVL comp k s === toVL outer (toVL inner k) s
+
+prop_ltvl_fstFst :: ((Int, Int), Int) -> Fun Int Int -> Property
+prop_ltvl_fstFst s g =
+  let outer = mkFocal (fstF :: Focusing Int ((Int, Int), Int) ((Int, Int), Int) (Int, Int) (Int, Int))
+      inner = mkFocal (fstF :: Focusing Int (Int, Int) (Int, Int) Int Int)
+      comp  = composeFocal outer inner
+      k x = Just (applyFun g x)
+  in toVL comp k s === toVL outer (toVL inner k) s
+
+--------------------------------------------------------------------
+-- Concrete examples (regression)
 --------------------------------------------------------------------
 
 prop_concrete_tuple :: Property
@@ -494,32 +691,25 @@ prop_concrete_list =
   overF (unsafeElementF 1) (*10) ([1, 2, 3] :: [Int]) === [1, 20, 3]
 
 --------------------------------------------------------------------
--- Tuple & List Update
+-- elementF contract
 --------------------------------------------------------------------
 
-prop_fstF_update :: (Int, String) -> Property
-prop_fstF_update (x, s) =
-  overF fstF show (x, s) === (show x, s)
+prop_elementf_negative :: [Int] -> Bool
+prop_elementf_negative _ = isNothing (elementF (-1 :: Int))
 
-prop_sndF_update :: (String, Int) -> Property
-prop_sndF_update (s, x) =
-  overF sndF show (s, x) === (s, show x)
+--------------------------------------------------------------------
+-- Edit independence (observation)
+--------------------------------------------------------------------
 
-prop_listElement_negative :: [Int] -> Bool
-prop_listElement_negative _ = case elementF (-1 :: Int) of Nothing -> True; _ -> False
-
-prop_listElement_update :: [Int] -> Property
-prop_listElement_update xs =
-  not (null xs) ==> do
-    let f = unsafeElementF 0
-    overF f (+1) xs === (head xs + 1) : tail xs
-
-prop_listElement_update_random :: [Int] -> NonNegative Int -> Property
-prop_listElement_update_random xs (NonNegative n) =
-  not (null xs) ==> do
-    let i = n `mod` length xs
-        f = unsafeElementF i
-    overF f (+1) xs === take i xs ++ [xs !! i + 1] ++ drop (i + 1) xs
+prop_obs_independentFoci :: ([Int], [Int]) -> Property
+prop_obs_independentFoci (xs, ys) =
+  not (null xs) && not (null ys) ==> do
+    let fLs = fstF >>> unsafeElementF 0
+        fRs = sndF >>> unsafeElementF 0
+        applyLsThenRs t = overF fLs (const 99) (overF fRs (const 77) t)
+        applyRsThenLs t = overF fRs (const 77) (overF fLs (const 99) t)
+        input = (xs, ys)
+    applyLsThenRs input === applyRsThenLs input
 
 --------------------------------------------------------------------
 -- QuickCheck generators
@@ -546,10 +736,10 @@ instance Arbitrary a => Arbitrary (Rose a) where
 --   whose subtrees may be structurally equal.
 genRoseWithDup :: Gen (Rose Int)
 genRoseWithDup = do
-  label <- arbitrary
+  lbl <- arbitrary
   subtree <- sized arbRoseSmall
   let dup = subtree
-  return $ Rose label [subtree, dup]
+  return $ Rose lbl [subtree, dup]
   where
     arbRoseSmall n = do
       k <- chooseInt (0, min 1 n)
@@ -567,7 +757,3 @@ genBinWithDup = do
       [ Leaf <$> arbitrary
       , Node <$> go (n `div` 2) <*> go (n `div` 2)
       ]
-
---------------------------------------------------------------------
--- Rose-specific child navigation (needed for multilevel tests)
--- Re-using ZipTree operations already imported

@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 
 -- | Core types and operations for the Focal library.
@@ -15,7 +16,9 @@
 module Focal.Core
   ( -- * Core types
     Focusing(..)
-  , Focal(..)
+  , Focal
+  , mkFocal
+  , withFocal
     -- * Construction
   , idF
   , fromLensLike
@@ -63,12 +66,24 @@ data Focusing c s t a b = Focusing
 
 -- | Existentially quantified variant of 'Focusing'.
 --   The residual type @c@ is hidden — only the composable interface remains.
+--   The constructor is not exported: build with 'mkFocal' and eliminate with
+--   'withFocal' (or the 'Focal'-level wrappers in this module).
 --
 --   Use 'Focusing' when you need to inspect the residual (zipper navigation,
 --   refactoring context, database provenance). Use 'Focal' when you only need
 --   composition and the residual shape is an implementation detail.
 data Focal s t a b where
   Focal :: Focusing c s t a b -> Focal s t a b
+
+-- | Pack a 'Focusing' as a 'Focal' (the residual is hidden).
+mkFocal :: Focusing c s t a b -> Focal s t a b
+mkFocal = Focal
+
+-- | Eliminate a 'Focal' via the CPS/rank-2 encoding: the continuation
+--   receives the underlying 'Focusing' with @c@ skolemised. Equivalent in
+--   power to pattern matching the (unexported) constructor.
+withFocal :: Focal s t a b -> (forall c. Focusing c s t a b -> r) -> r
+withFocal (Focal f) k = k f
 
 -- | Identity focus. The residual is unit — no extra information is needed
 --   because the \"focus\" is the whole structure.
@@ -121,7 +136,7 @@ infixr 3 >>>
 
 -- | Apply a pure function to the focus, rebuilding the whole.
 --
---   Law: @overF f id == id@ (no-op update preserves the structure)
+--   Law (L-GP, lawful instances — see docs/foundation.md §3): @overF f id == id@ (no-op update preserves the structure)
 overF :: Focusing c s t a b -> (a -> b) -> s -> t
 overF f g s =
   let (a, c) = splitF f s
@@ -165,6 +180,8 @@ toStoreLikeFocal (Focal f) = toStoreLike f
 --     (\p -> personName p)
 --     (\p newName -> p { personName = newName })
 --   @
+--
+--   The GP/PG/PP obligations are inherited from the supplied @view@/@set@ pair (docs/conformance.md).
 fromLensLike :: (s -> a) -> (s -> b -> t) -> Focusing s s t a b
 fromLensLike view set = Focusing split plug
   where

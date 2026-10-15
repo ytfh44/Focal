@@ -9,16 +9,19 @@
 --
 --   * "Focal.Core"  — 'Focusing', 'Focal', composition, application
 --   * "Focal.Tuple" — 'fstF', 'sndF'
---   * "Focal.List"  — 'elementF', 'unsafeElementF'
---   * "Focal.Zipper" — 'ZipTree', 'Zip', navigation, tree instances
+--   * "Focal.List"  — 'elementF', 'elementAt', 'unsafeElementF'
+--   * "Focal.Zipper" — 'ZipTree', 'Zip', navigation, tree instances, 'fromZip'/'focusAt'
+--   * "Focal.Interop" — 'VLens', 'PStore', 'toVL', 'fromVL', 'normalize'
 module Lib
   ( module Focal.Core
   , module Focal.Tuple
   , module Focal.List
   , module Focal.Zipper
+  , module Focal.Interop
   ) where
 
 import Focal.Core
 import Focal.Tuple
 import Focal.List
 import Focal.Zipper
+import Focal.Interop

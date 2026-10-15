@@ -33,8 +33,7 @@ module Focal.Zipper
   , safeNavigate
     -- * Bridge to Focusing
   , fromZip
-  , safeFocusAt
-  , unsafeFocusAt
+  , focusAt
     -- * Shipped instances
   , BinTree(..)
   , BinFrame(..)
@@ -42,8 +41,6 @@ module Focal.Zipper
   , Rose(..)
   , RoseFrame(..)
   ) where
-
-import GHC.Stack (HasCallStack)
 
 import Focal.Core (Focusing(..))
 
@@ -134,32 +131,34 @@ safeNavigate path t = go path (rootZip t)
 --   Snapshot semantics: @splitF@ ignores its argument and returns the focus
 --   and context captured in the zipper. It is input-invariant only for the
 --   tree the zipper was built from, and not a general split-plug lawful
---   instance for other sources (docs/conformance.md). Dynamic path-focused
---   construction is tracked in ROADMAP 0d.
+--   instance for other sources (docs/conformance.md). For the dynamic,
+--   input-sensitive counterpart see 'focusAt'.
 fromZip :: ZipTree t => Zip t -> Focusing [Frame t] t t t t
 fromZip z = Focusing
   { splitF = \_ -> (current z, context z)
   , plugF  = \ctx b -> rebuild b ctx
   }
 
--- | Create a snapshot 'Focusing' for a given path, returning 'Nothing' if
---   the path does not exist in the tree.
+-- | Build a focus at a path. The path is validated against the supplied
+--   tree at construction time ('Nothing' if it does not exist).
 --
---   Same snapshot semantics as 'fromZip'. 'Nothing' covers only the path
---   check against the supplied tree @t@ — not any other source the
---   'Focusing' may later be applied to.
-safeFocusAt :: ZipTree t => [Child t] -> t -> Maybe (Focusing [Frame t] t t t t)
-safeFocusAt path t = fromZip <$> safeNavigate path t
-
--- | Unsafe version of 'safeFocusAt'. Throws an error if the path is invalid.
---
---   Same snapshot semantics as 'safeFocusAt'; the error is raised before any
---   'Focusing' is built.
-unsafeFocusAt :: (ZipTree t, HasCallStack, Show (Child t)) => [Child t] -> t -> Focusing [Frame t] t t t t
-unsafeFocusAt path t =
+--   Unlike 'fromZip', the result is *dynamic*: @splitF@ re-navigates the
+--   supplied source, so the focus is whatever sits at @path@ in the tree
+--   passed to @splitF@/@plugF@. It is input-invariant on its declared
+--   domain — trees in which @path@ exists. Outside the domain (a later
+--   source lacking the path), @splitF@ raises a delayed 'error': 'Focusing'
+--   has no failure channel.
+focusAt :: ZipTree t => [Child t] -> t -> Maybe (Focusing [Frame t] t t t t)
+focusAt path t =
   case safeNavigate path t of
-    Just z  -> fromZip z
-    Nothing -> error $ "unsafeFocusAt: invalid path " ++ show path
+    Nothing -> Nothing
+    Just _  -> Just Focusing
+      { splitF = \t' ->
+          case safeNavigate path t' of
+            Just z  -> (current z, context z)
+            Nothing -> error "focusAt: path not found in the supplied tree"
+      , plugF = \ctx b -> rebuild b ctx
+      }
 
 -- ---------------------------------------------------------------------------
 -- Binary tree

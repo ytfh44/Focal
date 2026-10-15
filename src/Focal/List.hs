@@ -11,6 +11,7 @@
 module Focal.List
   ( ListCtx
   , elementF
+  , elementAt
   , unsafeElementF
   ) where
 
@@ -30,7 +31,7 @@ type ListCtx a = ([a], [a])
 --   Declared domain: @0 <= n < length xs@. Outside it (on the list side),
 --   'splitF' raises a delayed 'error': 'Focusing' has no failure channel, so
 --   the bounds check cannot run at construction time. A check-at-construction
---   variant (@elementAt@) is planned; see ROADMAP 0c.
+--   variant is 'elementAt'.
 --
 --   >>> import Focal.Core (overF)
 --   >>> fmap (\f -> overF f (*10) [1,2,3]) (elementF 1)
@@ -47,15 +48,34 @@ elementF n
       , plugF = \(left, right) y -> left ++ [y] ++ right
       }
 
+-- | Checked list element focus: the bounds check runs at construction time.
+--   Returns 'Nothing' unless @0 <= n < length xs@.
+--
+--   The returned 'Focusing' has the same declared domain as 'unsafeElementF'
+--   (lists with @length > n@); applying it to a shorter list still raises the
+--   same delayed 'error'.
+--
+--   >>> import Focal.Core (overF)
+--   >>> fmap (\f -> overF f (*10) [1,2,3]) (elementAt 1 [1,2,3])
+--   Just [1,20,3]
+--
+--   >>> fmap (\f -> overF f (*10) [1,2,3]) (elementAt 9 [1,2,3])
+--   Nothing
+elementAt :: Int -> [a] -> Maybe (Focusing (ListCtx a) [a] [a] a a)
+elementAt n xs
+  | n < 0 || n >= length xs = Nothing
+  | otherwise = Just (unsafeElementF n)
+
 -- | Unsafe list element focus. Throws an error if index is out of bounds.
 --   Uses 'HasCallStack' so the error location is reported.
 --
+--   >>> import Focal.Core (overF)
 --   >>> overF (unsafeElementF 1) (*10) [1,2,3]
 --   [1,20,3]
 --
---   >>> unsafeElementF (-1)
---   *** Exception: unsafeElementF: index -1 out of bounds
---   ...
+--   Calling it with a negative index, or applying the returned 'Focusing'
+--   outside its declared domain (@0 <= n < length@), raises an 'error'
+--   ('HasCallStack' reports the call site).
 unsafeElementF :: HasCallStack => Int -> Focusing (ListCtx a) [a] [a] a a
 unsafeElementF n
   | n < 0 = error $ "unsafeElementF: index " ++ show n ++ " out of bounds"

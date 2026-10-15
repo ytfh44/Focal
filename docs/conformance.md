@@ -11,16 +11,17 @@ not an instance (projection).
 
 | Instance | L-GP | L-PG | L-PP | L-OVF | Input invariance | Domain & failure modes | Witnesses | Notes |
 |---|---|---|---|---|---|---|---|---|
-| `idF` | def | def | def | def | ✓ | total; no failure mode | `prop_a1_idF`, `prop_a2_idF`, `prop_a3_idChain` | definitional — no empirical content |
-| `fstF`, `sndF` | ✓ | ✓ | ✓ | ✓ | ✓ | total; no failure mode | `prop_a1_fstF`, `prop_a1_sndF`, `prop_a3_tupleChain`, `prop_a4_leftId_fst`, `prop_a4_rightId_fst`, `prop_fstF_update`, `prop_sndF_update`, `prop_concrete_tuple` | type-changing shapes: GP/PG/PP N/A (foundation §2) |
-| `pureF`, `fromLensLike` | cnd | cnd | cnd | cnd | ✓ | inherited from the embedded `view`/`set` | `prop_a1_pureF` (identity lens — no discriminating power) | lawful iff the embedded pair is; non-trivial instance + counterexample scheduled (ROADMAP 0b); L-OVF needs the pair's put-get/put-put |
-| `elementF` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain `0 <= n < length xs`; outside it, delayed `error` from `splitF` | `prop_listElement_negative` | construction-time full check (`elementAt`) scheduled (ROADMAP 0c) |
-| `unsafeElementF` | ✓ | ✓ | ✓ | ✓ | ✓ | `0 <= n`; immediate `error` for `n < 0`; delayed `error` for `n >= length xs` | 15 properties — all list-family checks, incl. `prop_xd_sameFocus_overwrite` (the L-OVF instance) | in-domain behavior identical to `elementF` |
-| `fromZip` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | total; no failure mode | `prop_a1_roseZip`, `prop_a1_binZip`, `prop_a2_rose_depends`, `prop_a4_leftId_zipper`, `prop_a4_rightId_zipper`, `prop_a6_rose`, `prop_a6_binTree`, `prop_xb_fromZip_roundtrip`, `prop_xb_multilevel` | **snapshot constructor** (foundation §4.2): `splitF` ignores its argument |
-| `safeFocusAt` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | path validated once against the supplied tree; `Nothing`, never a throw | `prop_xb_safeFocusAt_valid`, `prop_xb_safeFocusAt_invalid` | snapshot; `Nothing` covers only the path check against `t`; retire-vs-rename decided in ROADMAP 0d |
-| `unsafeFocusAt` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | invalid path ⇒ immediate `error` | (none — registered gap) | snapshot; naming defect registered → ROADMAP 0d |
-| `overFM`, `toStoreLike` | — | — | — | — | — | `overFM`: Functor-level, no law beyond the functor laws; `toStoreLike`: projection | `prop_a5_overFM_pure` (definitional) | L-NORM / L-TVL gaps → ROADMAP 0e |
-| `Focal` | N/A | N/A | N/A | N/A | — | no exported operations tested | (none — registered gap) | residual hidden; ladder + `mkFocal`/`withFocal` scheduled (ROADMAP 0e) |
+| `idF` | def | def | def | def | ✓ | total; no failure mode | `prop_lgp_idF`, `prop_lassoc_idChain`, `prop_lunit_*` | definitional — no empirical content |
+| `fstF`, `sndF` | ✓ | ✓ | ✓ | ✓ | ✓ | total; no failure mode | `prop_lgp_fstF`, `prop_lgp_sndF`, `prop_lpg_fstF`, `prop_lpg_sndF`, `prop_lpp_fstF`, `prop_lovf_fstF`, `prop_lovf_sndF`, `prop_lassoc_tupleChain`, `prop_lunit_left_fst`, `prop_lunit_right_fst`, `prop_concrete_tuple` | type-changing shapes: GP/PG/PP N/A (foundation §2) |
+| `pureF`, `fromLensLike` | cnd | cnd | cnd | cnd | ✓ | inherited from the embedded `view`/`set` | `prop_lgp_pureF`, `prop_lpg_userLens`, `prop_lpp_userLens` | lawful iff the embedded pair is; non-trivial lawful instance (`userLens`) and unlawful counterexamples (`prop_disc_*`) tested; L-OVF needs the pair's put-get/put-put |
+| `elementF` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain `0 <= n < length xs`; outside it, delayed `error` from `splitF` | `prop_lgp_list`, `prop_lpg_elementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_elementf_negative` | construction-time full check is `elementAt` |
+| `unsafeElementF` | ✓ | ✓ | ✓ | ✓ | ✓ | `0 <= n`; immediate `error` for `n < 0`; delayed `error` for `n >= length xs` | `prop_lgp_list`, `prop_lpg_unsafeElementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_lovf_composed`, `prop_concrete_list` | in-domain behavior identical to `elementF` |
+| `fromZip` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | total; no failure mode | `prop_lgp_roseZip`, `prop_lgp_binZip`, `prop_lpp_fromZip`, `prop_lunit_left_zipper`, `prop_lunit_right_zipper`, `prop_occ_rose`, `prop_occ_binTree`, `prop_zip_multilevel`, `prop_contract_zip_ignoresInput`, `prop_contract_zip_pgCaptured` | **snapshot constructor** (foundation §4.2): `splitF` ignores its argument; snapshot contracts pinned by `prop_contract_zip_*` |
+| `focusAt` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain: trees in which `path` exists; construction returns `Nothing` if the path is absent in the given tree; `splitF` on a later tree lacking the path raises a delayed `error` | `prop_focusat_*` | dynamic (input-invariant); path-validity premise per tree (foundation §2) |
+| `elementAt` | ✓ | ✓ | ✓ | ✓ | ✓ | domain `0 <= n < length xs` of the construction list; `Nothing` otherwise; the returned `Focusing` keeps `elementF`'s delayed error off-domain | `prop_elementat_*` | checked construction-time variant of `elementF` |
+| `overFM`, `toStoreLike` | — | — | — | — | — | `overFM`: Functor-level, no law beyond the functor laws; `toStoreLike`: projection | (none — no law claimed) | L-NORM / L-TVL are provided by `Focal.Interop` (shipped) |
+| `Focal` | N/A | N/A | N/A | N/A | — | no exported operations tested directly; laws at the `Focal` level are extensional (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | constructor hidden; `mkFocal`/`withFocal` + `Focal.Interop` shipped |
+| `Focal.Interop` (`toVL`/`fromVL`/`normalize`) | — | — | — | — | — | rank-2 CPS via `mkFocal`/`withFocal`; extensional only (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | conversions are extensional; residual not recoverable |
 
 Verdict footnotes:
 
@@ -28,8 +29,8 @@ Verdict footnotes:
   the tree `plugF` rebuilds). For any other source the round-trip fails; the
   shipped tests apply snapshots only to their own tree.
 - **✓†** — PP is vacuous for snapshots: `splitF` is constant, so `c'` is always
-  the captured stack and the equation holds by construction. It is not evidence
-  of overwrite behavior on arbitrary sources.
+  the captured stack and the equation holds by construction (`prop_lpp_fromZip`
+  pins this). It is not evidence of overwrite behavior on arbitrary sources.
 - `fromZip`'s PG fails in general: `plugF` produces `rebuild b c`, and
   re-splitting that value returns the captured focus, not `b`.
 - `fromZip`'s L-OVF fails for the same reason: after one edit, the re-split
@@ -37,29 +38,22 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree:
+Reviewed property-by-property against the working tree (**64 properties**,
+plus the doctest suite):
 
-- **L-PG: 0 of 43.** No property asserts the retrieve clause directly.
-- **L-PP: 0 of 43.** No property asserts the re-derived-residual equation
-  directly.
-- **L-OVF: 1 of 43** — `prop_xd_sameFocus_overwrite`, narrow: one instance
-  (`unsafeElementF` on lists) and a fixed function pair `(+1) ∘ (*2)`
-  (verified against code). It evaluates through a re-split and a re-plug, and
-  separates the PP-violating model E3 (foundation §2), but its statement is the
-  L-OVF equation — not PG or PP.
-- **L-GP: 12 of 43** — `prop_a1_*` (8), `prop_a2_*` (3), and
-  `prop_xb_fromZip_roundtrip` (1).
-- **L-ASSOC: 3 of 43**; **L-UNIT: 6 of 43**.
-- The remaining 21 properties: 1 definitional re-check (`prop_a3_plugLaw`),
-  1 definitional smoke (`prop_a5_overFM_pure`), 3 occurrence≠value corollaries,
-  2 zipper round-trips, 2 zipper navigation tests, 3 remaining XB navigation
-  tests, 2 remaining XD edit-survival tests, 2 concrete regressions, 5
-  list/tuple update regressions.
+- **L-GP: 8 of 64** (`prop_lgp_*`).
+- **L-PG: 7 of 64** (`prop_lpg_*`).
+- **L-PP: 5 of 64** (`prop_lpp_*`; one trivially-satisfied snapshot case,
+  `prop_lpp_fromZip`).
+- **L-OVF: 4 of 64** (`prop_lovf_*` — four instances, arbitrary function pairs).
+- **L-ASSOC: 3 of 64** (`prop_lassoc_*`); **L-UNIT: 6 of 64** (`prop_lunit_*`).
+- **L-NORM: 2 of 64** (`prop_lnorm_*`); **L-TVL: 2 of 64** (`prop_ltvl_*`).
+- The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
+  law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
+  2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,
+  2 concrete regressions, 1 `elementF` contract test, 1 edit-independence
+  observation.
 
-Entries that overstate what they assert (rewrite scheduled in ROADMAP 0b):
-
-- `prop_a2_list_depends` and `prop_a2_rose_depends`: names mention residual
-  dependence; bodies re-assert L-GP.
-- `prop_a2_idF`: L-GP restatement (round-trip on a shifted source).
-- `prop_xb_fromZip_roundtrip`: third restatement of L-GP for the snapshot
-  family.
+Resolved in ROADMAP 0b: the `prop_a2_*` trio, `prop_a3_plugLaw`, and
+`prop_xb_fromZip_roundtrip` were duplicate/definitional entries and no longer
+exist.
