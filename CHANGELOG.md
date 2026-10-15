@@ -8,5 +8,12 @@ and this project adheres to the
 
 ## Unreleased
 
+- Documentation layer revision: added `docs/foundation.md` (axiom A-LENS, L0–L6
+  hierarchy, law vocabulary, contracts, representation ladder, defect log) and
+  `docs/conformance.md` (instance × law matrix); reworked the README law
+  chapter; rewrote the roadmap around law-id-tagged acceptance criteria; and
+  corrected haddock/contract wording in `Focal.Core`, `Focal.List`, and
+  `Focal.Zipper`. No behavior changes.
+
 ## 0.1.0.0 - YYYY-MM-DD
 

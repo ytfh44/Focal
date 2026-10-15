@@ -1,0 +1,244 @@
+# Focal — Foundation
+
+Normative classification of every law, contract, and claim in this repository.
+This file is the authority for what counts as an **axiom**; the README summarizes
+it, and [`ROADMAP.md`](../ROADMAP.md) §0 carries engineering constraints.
+
+Working tree: `0.1.0.0` (unreleased), 2026-10-15. Code is ground truth: where
+this document and the code disagree, the code wins and this document is fixed.
+
+## 1. Terms and hierarchy
+
+- **Declared domain** — the inputs for which a constructor promises to behave
+  (e.g. `0 <= n < length xs` for `elementF`). Outside it, a registered failure
+  mode applies instead.
+- **Lawful instance** — a `Focusing` opted into **A-LENS** (§2) with per-instance
+  witnesses registered in [`conformance.md`](conformance.md).
+- **Residual image** — `image (snd . splitF)` for a given instance.
+
+| Level | Name | What it is | Enforced by | Violation consequence |
+|---|---|---|---|---|
+| **L0** | Structure definitions | `Focusing c s t a b` with `splitF :: s -> (a, c)`, `plugF :: c -> b -> t`; **type facts**: no `Env`/`IO`/state slot (locality), and the constructor is public, so forgery cannot be prevented at the type level | The type system | Cannot be prevented (registered per instance in `conformance.md`) |
+| **L1** | Axiom | **A-LENS** (the only axiom): a lawful instance satisfies GP, PG, and PP on its declared domain (§2) | Assumption (assume–guarantee) + per-instance witness tests | Not in the lawful subclass; its behavior is protected by no law |
+| **L2** | Definitional identities | `idF` behavior (`splitF idF s == (s, ())`, `plugF idF () b == b`); the `composeF` plug law (true by unfolding) | Definition | None (no failure mode) |
+| **L3** | Corollaries | Occurrence ≠ value (corollary of GP); composition associativity and unit laws, modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | Derivation (§3) | None |
+| **L4** | Representation theorems | `withFocal` CPS form; the coend / co-Yoneda characterization; the Van Laarhoven form (§5) | Cited proofs + premises | Citing past the premises is unsound |
+| **L5** | Contracts | Constructor domains, codomains, failure modes, input invariance, claim discipline (§4) | Documentation + conformance matrix (+ later tests) | An unregistered exemption is a defect |
+| **L6** | Engineering constraints | Scope boundaries and process — single home: `ROADMAP.md` §0 | Review / CI | Design defect |
+
+A statement is an axiom iff it is *assumed* rather than derived or definitional,
+and violations are not excluded by the types. Exactly one statement qualifies:
+**A-LENS**.
+
+## 2. The axiom: A-LENS
+
+For the mono form (`s = t`, `a = b`), a lawful instance `f` satisfies, on its
+declared domain:
+
+- **GP (rebuild)** — `plugF f (snd (splitF f s)) (fst (splitF f s)) == s`
+- **PG (retrieve)** — for every `c` in the residual image and every `b`:
+  `fst (splitF f (plugF f c b)) == b`
+- **PP (overwrite)** — for every such `c` and all `b1`, `b2`, with
+  `(_, c') = splitF f (plugF f c b1)`:
+  `plugF f c' b2 == plugF f c b2`
+
+Well-formedness: GP and PG require `s ~ t` and `a ~ b`; PP requires `s ~ t`.
+Where a shape does not satisfy this (e.g. the type-changing instance
+`fstF :: Focusing b (a, b) (x, b) a x`), the clause is marked **N/A** for that
+instance; it would need a type-changing lens-law system, which this library does
+not provide.
+
+### A-LENS is an assume–guarantee obligation
+
+The `Focusing` constructor is public and `plugF` receives no `s`; nothing in the
+types forces a residual to have come from `splitF`. GP/PG/PP can therefore be
+assumed only for instances that declare themselves lawful and exhibit witnesses
+(`conformance.md`). Violations are caught per instance, never per type.
+
+### Independence witnesses
+
+Each clause can fail while the other two hold.
+
+**E1 — violates only PG** (`s = a = b = Int`):
+
+```haskell
+splitE1 :: Int -> (Int, Int)
+splitE1 s = (0, s)
+
+plugE1 :: Int -> Int -> Int
+plugE1 c _ = c
+
+-- check:
+--   ( plugE1 (snd (splitE1 5)) (fst (splitE1 5)) == 5   -- GP holds
+--   , fst (splitE1 (plugE1 0 9)) /= (9 :: Int) )        -- PG fails
+-- == (True, True)
+-- PP holds: the residual is the source itself, so re-deriving it is idempotent.
+```
+
+**E2 — violates only GP** (type-changing shape: `s :: Int`, `a :: Word`):
+
+```haskell
+splitE2 :: Int -> (Word, ())
+splitE2 s = (fromIntegral (abs s), ())
+
+plugE2 :: () -> Word -> Int
+plugE2 () = fromIntegral
+
+-- check:
+--   ( plugE2 (snd (splitE2 (-5))) (fst (splitE2 (-5))) /= (-5 :: Int)  -- GP fails
+--   , fst (splitE2 (plugE2 () (3 :: Word))) == 3 )                     -- PG holds
+-- == (True, True)
+-- PP holds: the residual is always ().
+```
+
+**E3 — violates only PP** (finite model; `a = b = B`):
+
+```haskell
+data S = T1 | X | Y
+data C = C0 | C1
+data B = B0 | B1
+
+split3 :: S -> (B, C)
+split3 T1 = (B0, C0)
+split3 X  = (B1, C0)
+split3 Y  = (B1, C1)
+
+plug3 :: C -> B -> S
+plug3 C0 B0 = T1
+plug3 C0 B1 = X
+plug3 C1 B0 = T1
+plug3 C1 B1 = Y
+
+-- GP holds for all of S; PG holds for all c and b.
+-- PP fails at c = C1, b1 = B0, b2 = B1:
+--   (_, c') = split3 (plug3 C1 B0) = split3 T1 = (B0, C0)   =>  c' = C0
+--   plug3 C0 B1 = X   but   plug3 C1 B1 = Y   (X /= Y)
+```
+
+### Explicit negations
+
+- Locality (`plugF` has no `Env`/`IO`) is an **L0** type fact — not an axiom,
+  and no property can witness it.
+- "Occurrence ≠ value" is an **L3** corollary of GP.
+- The `idF` and `composeF` equations are **L2** definitional identities.
+- Structural enforcement does **not** hold for A-LENS: the constructor is
+  public and `plugF` receives no `s`.
+
+## 3. Law vocabulary
+
+Every law or contract claim in this repository cites one of the identifiers
+below. "Witness" names existing tests (`../test/Spec.hs`); a **gap** is
+scheduled in `ROADMAP.md`.
+
+| law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
+|---|---|---|---|---|
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 12 of 43: `prop_a1_*` (8), `prop_a2_*` (3, restatements — see conformance), `prop_xb_fromZip_roundtrip` (1) |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | **gap** → ROADMAP 0b (no property asserts it today) |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | **gap** → ROADMAP 0b |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | `prop_xd_sameFocus_overwrite` — narrow: one instance (`unsafeElementF` on lists), fixed pair `(+1) ∘ (*2)`; broaden in ROADMAP 0b |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | `prop_a3_idChain`, `prop_a3_tupleChain`, `prop_a3_listTupleChain` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | `prop_a4_leftId_*`, `prop_a4_rightId_*` (6) |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | Planned `Focal.Interop` (ROADMAP 0e) | **gap** → 0e |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | Planned `Focal.Interop` (ROADMAP 0e) | **gap** → 0e |
+| definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | `prop_a3_plugLaw` — a definitional re-check; passes by unfolding, not evidence |
+
+Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
+re-split focus `a' = g1 a`, using `(a, c) = splitF f s`), then applies PP with
+`b2 = g2 a'` to move from the re-derived residual back to `c`.
+
+`L-NORM` and `L-TVL` are extensional by necessity: `Focal` hides `c`, and an
+existential in Haskell is not a quotient (§5). Any law needing the residual must
+be stated on `Focusing`.
+
+## 4. Contracts
+
+### 4.1 Totality policy
+
+Safe constructors must not throw on their declared domains. Partiality is
+permitted only as:
+
+1. a **deferred `error`** — for checks that cannot run at construction time
+   (`Focusing` has no failure channel); or
+2. a future **return channel** (`FocusingE`, ROADMAP items 4–5).
+
+Every throw site is registered below and in `conformance.md`:
+
+| Throw site | Domain | Behavior |
+|---|---|---|
+| `elementF`'s `splitF` | outside `0 <= n < length xs` | delayed `error` ("precondition violated") |
+| `unsafeElementF`, construction | `n < 0` | immediate `error` |
+| `unsafeElementF`'s `splitF` | `n >= length xs` | delayed `error` |
+| `unsafeFocusAt`, construction | path absent in the supplied tree | `error` before any `Focusing` is built |
+
+### 4.2 Input invariance
+
+`splitF f s` may depend on `s` and on nothing else — not on external state, not
+on a residual or focus captured at construction time.
+
+**Exemption (must be named):** the snapshot constructors `fromZip`,
+`safeFocusAt`, and `unsafeFocusAt` ignore their argument by construction. They
+are exempt and are marked as such in `conformance.md`. Consequences: for those
+instances GP holds only for the tree the snapshot was taken from, and PG fails
+in general.
+
+### 4.3 Claim discipline
+
+Every guarantee-style statement in the README or in haddock must map to an
+L0–L6 level and cite either a witness or an explicit not-enforced marker.
+Claims that cannot be so mapped are defects, not documentation.
+
+## 5. Representation ladder and caveats
+
+Four equivalent readings of a `Focusing`, each with its own premise:
+
+1. **CPS closure.** Packing the residual as an existential is the CPS form:
+   `∃C. P(C) ≅ ∀R. (∀C. P(C) → R) → R` — this is what `mkFocal` / `withFocal`
+   (ROADMAP 0e) expose.
+2. **Coend / co-Yoneda.** The existential pair of a decomposition and a rebuild
+   is a coend:
+   `∫^C Hom(S, A×C) × Hom(C×B, T) ≅ S → (A × (B → T))` — the `Focal` packaging
+   is extensionally a Store; the residual is not recoverable from `Focal`.
+3. **Van Laarhoven form.** For the mono lawful case, the same data is
+   `≅ ∀F. Functor F ⇒ (A → F B) → S → F T`; the interpretation formula is
+   `\k s -> fmap (plugF f c) (k a)` where `(a, c) = splitF f s`. This is what
+   `overFM` implements, and why only `Functor` is required.
+4. **Extensional-only laws.** Laws stated on `Focal` (`L-NORM`, `L-TVL`) hold
+   only extensionally, because of item 1.
+
+Caveats:
+
+- **An existential in Haskell is not a quotient.** Distinct residual
+  representations with equal behavior are not identified; equations on `Focal`
+  are extensional.
+- **Parametricity assumptions.** The isomorphisms above hold for the total,
+  parametric fragment. Bottom, `seq`, and `unsafeCoerce` can break the
+  implication from representation to behavior — the known limitation of
+  Van Laarhoven-style representations.
+- References: Jaskelioff & O'Connor, *A representation theorem for second-order
+  functionals*, JFP 2015, [doi:10.1017/S0956796815000088](https://doi.org/10.1017/S0956796815000088);
+  McBride, *Clowns to the Left of Me, Jokers to the Right*, POPL '08;
+  Huet, *Functional Pearl: The Zipper*, JFP 1997.
+
+## 6. Defect log
+
+"Before" paraphrases the old wording instead of quoting it, so that the retired
+phrases do not survive anywhere in this repository (see the audit note below).
+
+| ID | Where | Before | After |
+|---|---|---|---|
+| D1 | README, former axiom chapter | The A1–A6 list was presented as a set of axioms, mixing one (unstated) axiom with definitional identities, instance obligations, and a corollary | README "Law status" + §1 here: A-LENS is the only axiom; the rest is classified L0–L6 |
+| D2 | README axiom-status column | A1/A2/A4/A6 were marked as structurally enforced although the constructor is public and `plugF` receives no `s` | "Enforced by" columns state assumption + per-instance witnesses (§2) |
+| D3 | README "What's in scope", item 1 | Asserted both functions to be total and deterministic | "Total on their declared domains"; partiality policy §4.1 + conformance registry |
+| D4 | README, old axiom chapter opening | Called the interface lawful without stating any law | "Interface with explicit law obligations": obligations enumerated as law-ids (§3) |
+| D5 | README, Lens-like section | Claimed a general interop surface with `lens`/`optics`, including conversions that are not shipped | Limited to the shipped `toStoreLike` projection; `toVL`/`fromVL` scheduled (ROADMAP 0e), extensional only (§5) |
+| D6 | README boundary sentence, demo comment, `overFM` haddock | Framed the bridge as monadic, implying a `Monad` requirement | Functor-level wording: only `Functor` is required; Van Laarhoven interpretation formula |
+| D7 | README, A5 row | Locality was listed as an axiom with test coverage | L0 structure fact (signature-level); the single smoke test is definitional (conformance) |
+| D8 | README quick start + `fromZip` haddock | Snapshot builders were presented as general path focus; the demo comment did not match the operation | Snapshot semantics documented (input-invariance exemption §4.2); demo comment matches `(*10)` |
+| D9 | `Focal.Core`, `overFM` haddock | Contained a typo in the phrase describing effect externalization and assigned sequencing to `Monad` | Rewritten paragraph (typo removed; `Functor` only) |
+| D10 | `test/Spec.hs`, headers | Group titles asserted an "Axiom 1–6" scheme, and a comment claimed residuals cannot be forged | Law-id mapping ("was A#"); the forgery claim replaced by a conformance pointer |
+| D11 | README, coverage summary | Implied the property suite covered each listed axiom, including a residual-legality claim | Honest statement: property count kept; no property directly asserts L-PG or L-PP; classification and gaps in conformance |
+| D12 | README, specialization tables | Rows needing extended rungs were listed alongside core-supportable ones; the zipper row lacked the snapshot note | Table footnotes: extended rungs (`FocusingE`/`FocusingM`); snapshot semantics |
+| D13 | README, related work | Claimed strong representation results while omitting the representation-theorem references | Jaskelioff–O'Connor 2015 and the coend/co-Yoneda reference added (§5) |
+
+Audit: no file under `README.md`, `ROADMAP.md`, `src/`, `test/`, or `docs/`
+contains the retired phrases paraphrased in the "Before" column.

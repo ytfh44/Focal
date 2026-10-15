@@ -28,7 +28,7 @@ The library currently ships with a proof-of-concept set: Lens-like focusing, pos
 | **License** | BSD-3-Clause |
 | **Compiler** | GHC ≥ 9.0, Haskell Stack |
 | **Dependencies** | `base >= 4.7 && < 5` |
-| **Tests** | Tasty + QuickCheck (zipper round-trips, composition laws, concrete examples) |
+| **Tests** | Tasty + QuickCheck (zipper round-trips, composition laws, concrete examples); classification in [docs/conformance.md](docs/conformance.md) |
 
 ---
 
@@ -41,11 +41,11 @@ Zippers expose the residual as a concrete derivative stack, but are bound to tre
 **Focal** generalizes both. The residual `c` is a first-class, inspectable, composable value. You can:
 
 - Compose focusings with `(>>>)` (residuals accumulate as nested pairs)
-- Apply monadic functions through `overFM` (effects stay in the outer Monad)
+- Apply effectful functions through `overFM` — only `Functor` is required (effects stay in the outer functor)
 - Forget the residual to get Store-like interop with Lens via `toStoreLike`
 - Keep the residual explicit for navigation, provenance tracking, or change propagation
 
-The key architectural boundary: **Focal handles spatial decomposition; Monad handles temporal sequencing.** They compose cleanly via `overFM`.
+The key architectural boundary: **Focal handles spatial decomposition; the functor handles external interpretation.** They compose cleanly via `overFM`, whose type requires only `Functor` — the Van Laarhoven interpretation formula `fmap rebuild (k a)`.
 
 ---
 
@@ -60,7 +60,7 @@ pureF :: (s -> a) -> (s -> b -> t) -> Focusing s s t a b
 -- Under the hood: splitF s = (view s, s); plugF s b = set s b
 ```
 
-`fstF` and `sndF` are concrete instances for pairs. This is the interop surface with `lens`/`optics`: `toStoreLike` projects a `Focusing` into a Store-like `(a, b -> t)`.
+`fstF` and `sndF` are concrete instances for pairs. The shipped interop surface with `lens`/`optics` is `toStoreLike`, which projects a `Focusing` into a Store-like `(a, b -> t)`. Full Van Laarhoven conversions (`toVL`/`fromVL`) are scheduled (ROADMAP 0e) and would hold extensionally only — see [docs/foundation.md](docs/foundation.md) §5.
 
 ### 2. Positional list focus (`Focal.List`)
 
@@ -103,53 +103,41 @@ Serves as the unit of composition (`>>>`). Used in law tests to verify associati
 
 ---
 
-## Axiomatic foundation
+## Law status
 
-Focal is not just a data type — it's a **lawful explicit-residual focus** interface. The six core axioms below are not arbitrary syntactic requirements; they are reverse-engineered from the uses Focal is designed to support: Zipper, Lens-like optic, Redex context, Refactoring, Persistence view-update, and beyond.
+Focal is not just a data type — it's a focus **interface with explicit law obligations** (see [docs/foundation.md](docs/foundation.md)): every guarantee it makes is classified as an axiom, a definitional identity, a corollary, a representation theorem, or a contract.
+
+The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, on its declared domain, the three clauses below. Everything else Focal states is a definitional identity, a corollary, a representation theorem, or a contract. A-LENS is an assume–guarantee obligation, not a structural guarantee — the `Focusing` constructor is public and `plugF` receives no `s`, so legality is established per instance by witnesses.
+
+| Clause | Statement (mono form: `s = t`, `a = b`) |
+|---|---|
+| **GP** (rebuild) | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` |
+| **PG** (retrieve) | for `c` in the image of `snd . splitF`: `fst (splitF f (plugF f c b)) == b` |
+| **PP** (overwrite) | for such `c` and `b1`, `b2`, with `(_, c') = splitF f (plugF f c b1)`: `plugF f c' b2 == plugF f c b2` |
 
 ### Central principle
 
 > The residual context `c` must be concrete enough to rebuild, navigate, and interpret local edits — but restricted enough that it does not absorb application semantics and effects.
 
-### Core axioms
+### Hierarchy
 
-| # | Axiom | Status in library | Test coverage |
+| Level | What it is | Enforced by | Witness |
 |---|---|---|---|
-| **A1** | **Split—Plug Reconstruction**: `let (a, c) = splitF f s in plugF f c a == s` | Enforced structurally | 8 properties — `idF`, `fstF`, `sndF`, list, Rose, BinTree, `pureF`, composed |
-| **A2** | **Residual Legality**: `c` derives from a legitimate `splitF`, not an arbitrary forgeable value | `Focal` existential hides `c`; `Focusing` constructor exported (by design for inspection) | 3 properties — `idF`, list, Rose residuals tied to source |
-| **A3** | **Composition Associativity**: `(f >>> g) >>> h ≃ f >>> (g >>> h)` up to residual reassociation `((c1,c2),c3) ≃ (c1,(c2,c3))` | `>>>` nests residuals as pairs; behaviourally equivalent | 4 properties — `idF` chain, tuple chain, cross-module, plug law |
-| **A4** | **Identity Focus**: `idF >>> f ≃ f` and `f >>> idF ≃ f` | `idF` with `()` residual; law holds behaviourally | 6 properties — `fstF`, list element, zipper (left and right) |
-| **A5** | **Locality**: `plugF : c -> b -> t` — no Env, no IO, no global state | Type-enforced: no effects in signature | 1 property — `overFM` purity check |
-| **A6** | **Occurrence ≠ Value**: focus identity is `(a, c)`, not `a` alone; equal values at different positions yield different residuals | Residuals differ by position; type system tracks `c` | 3 properties — list (equal values at different indices), Rose, BinTree |
+| **L0** | Structure facts (`Focusing` signatures; public constructor) | The type system | Signature inspection |
+| **L1** | Axiom **A-LENS** (GP ∧ PG ∧ PP) | Assumption per instance | L-GP family; PG/PP gaps — see conformance |
+| **L2** | Definitional identities (`idF`; `composeF` plug law) | Definition | Definitional (no failure mode) |
+| **L3** | Corollaries (occurrence ≠ value; associativity/unit modulo residual reassociation) | Derivation | L-ASSOC / L-UNIT families |
+| **L4** | Representation theorems (CPS, coend/co-Yoneda, Van Laarhoven form) | Cited proofs + premises | Paper proofs — [docs/foundation.md](docs/foundation.md) §5 |
+| **L5** | Contracts (domains, failure modes, input invariance) | Documentation + conformance matrix | [docs/conformance.md](docs/conformance.md) |
+| **L6** | Engineering constraints (scope and process) | Review / CI | [ROADMAP.md](ROADMAP.md) §0 |
 
-### Extension axioms
+**Test families.** `XB` (navigation & path tests) and `XD` (edit-survival tests) run in `test/Spec.hs`; per-instance verdicts are in the conformance matrix.
 
-These extend the core for typed syntax, navigation, editing, sharing, and strategy. They are documented as the boundary between Focal's geometric guarantees and domain-specific semantics.
+**Boundary notes.** `XA` (type endpoints): deferred — requires indexed GADTs. `XC` (navigation normalization): decidable-child assumption not formalized. `XE` (sharing boundary): occurrence focus ≠ vertex focus for DAGs — documented boundary. `XF` (strategy externalization): no strategy in `plugF`, by design. `XG` (computability witness): `ZipTree` child selection defaults to `Int`; not yet exposed.
 
-| # | Axiom | Status |
-|---|---|---|
-| **XB** | **Path—Residual Consistency**: path view and residual view agree (`focusAt` / `pathOf` roundtrip) | 4 properties — `safeFocusAt`, `fromZip` roundtrip, multi-level navigation |
-| **XD** | **Edit Survival**: same-focus edits compose; nested edits decompose; independent foci commute (prefix-controlled fragment) | 3 properties — sequential `overF` composition, nested decomposition, independent-focus commutation |
-| **XA** | **Type Endpoints**: residual carries endpoint sorts; replacement preserves focus sort | Deferred — requires indexed GADTs |
-| **XC** | **Navigation Normalization**: arbitrary navigation normalizes to LCA + down only under tree-like and decidable-child assumptions | Implicit in `safeNavigate`; decidable-child not formalized |
-| **XE** | **Sharing Boundary**: occurrence focus ≠ vertex/entity focus for DAGs | Deferred — documented boundary in DAG section |
-| **XF** | **Strategy Externalization**: evaluation strategies live outside Focal core | By design — no strategy in `plugF` |
-| **XG** | **Computability Witness**: child selection requires decidable equality | Not yet exposed — `ZipTree` defaults to `Int` |
+### Coverage
 
-### Coverage summary
-
-The test suite has **43 QuickCheck properties** organized by axiom:
-
-- **A1** (8) — Split/plug roundtrip for all shipped focusings
-- **A2** (3) — Residual validity tied to source
-- **A3** (4) — Composition associativity including cross-module
-- **A4** (6) — Identity: left and right for tuple, list, zipper
-- **A5** (1) — Locality: monadic bridge purity
-- **A6** (3) — Occurrence ≠ value: list, Rose, BinTree
-- **XB** (4) — Path—residual consistency: focusAt, fromZip, multi-level
-- **XD** (3) — Edit survival: composition, nesting, commutation
-- **Zipper** (4) — Descend/ascend and up/down roundtrips
-- **Concrete + Regression** (7) — Tuple, list, edge cases
+The test suite has **43 QuickCheck properties**; their classification and gaps are tracked in [docs/conformance.md](docs/conformance.md) — currently **no property directly asserts L-PG or L-PP**, and L-OVF has a single narrow instance witness.
 
 ---
 
@@ -193,10 +181,12 @@ These map cleanly onto `Focusing` without adding new conceptual machinery. The r
 | # | Specialization | Residual `c` | `plug` behavior | Impl? |
 |---|---|---|---|---|
 | 1 | **Lens-like** | Original source `s` | Pure setter | ✅ `fstF`, `sndF`, `pureF` |
-| 2 | **Zipper** | Frame stack `[Frame t]` | Structural rebuild | ✅ `fromZip` |
+| 2 | **Zipper** | Frame stack `[Frame t]` | Structural rebuild (snapshot ‡) | ✅ `fromZip` |
 | 3 | **List position** | `(left, right)` segments | Concatenation | ✅ `elementF` |
 | 4 | **Typed Syntax** | Indexed stack `Stack j i` | Sort-checked rebuild | ❌ |
-| 5 | **Redex / Evaluation** | Evaluation context | Contraction strategy | ❌ |
+| 5 | **Redex / Evaluation** | Evaluation context | Contraction strategy | ❌ † |
+
+*† Row 5 needs an extended rung (`FocusingE`/`FocusingM`) — not an instance of the `Focusing` core as shipped. ‡ `fromZip` (and `safeFocusAt`/`unsafeFocusAt`) are snapshot constructors: `splitF` ignores its argument — see [docs/foundation.md](docs/foundation.md) §4.2.*
 
 - **Typed Syntax Focal** (4) is the indexed version: the residual carries both the tree path and the endpoint sorts, so a replacement with the wrong sort is a type error, not a runtime failure. It requires GADTs and type-level path tracking, which is why it's not in the initial release — but it is a natural extension of `Focal.Zipper`.
 
@@ -209,10 +199,12 @@ These still fit the `split`/`plug` shape, but the residual carries *semantic pro
 | # | Specialization | Residual `c` | `plug` produces | Impl? |
 |---|---|---|---|---|
 | 6 | **Refactoring** | Syntax stack + layout/type/scope facts | AST edit | ❌ |
-| 7 | **Patch / Delta** | Survival/reindexing witness | `Delta s` or conflict | ❌ |
-| 8 | **Incremental Computation** | Dependency trace + memo cells | `OutputDelta` | ❌ |
-| 9 | **UI / Form** | Widget path + validation context | `ModelDelta` or error | ❌ |
-| 10 | **Parser / Grammar** | Parser state + choice provenance | Parse forest | ❌ |
+| 7 | **Patch / Delta** | Survival/reindexing witness | `Delta s` or conflict | ❌ † |
+| 8 | **Incremental Computation** | Dependency trace + memo cells | `OutputDelta` | ❌ † |
+| 9 | **UI / Form** | Widget path + validation context | `ModelDelta` or error | ❌ † |
+| 10 | **Parser / Grammar** | Parser state + choice provenance | Parse forest | ❌ † |
+
+*† Rows 7–10 need extended rungs (`FocusingE`/`FocusingM` or domain-specific wrappers) — not instances of `Focusing` as shipped.*
 
 - **Refactoring Focal** (6) extends the zipper residual with layout information, scope snapshots, type facts, and span data. This is what IDE refactoring tools (extract-local, rename, case-split) need: not just "where" but "what's around it semantically." Focal's split/plug boundary captures exactly the tree-traversal and local-replacement part. The rest — alpha-equivalence, substitution, binder-sensitive equality — lives *outside* Focal in a language-semantics layer.
 
@@ -228,8 +220,10 @@ These still satisfy the split/plug contract, but the residual becomes dominated 
 
 | # | Specialization | Residual `c` | `plug` produces |
 |---|---|---|---|
-| 11 | **Query / Relational** | Projection provenance + join witnesses | `RelDelta` or `AmbiguousPutback` |
-| 12 | **Workflow / State-Machine** | Transition context + rollback plan | Workflow or `InvalidTransition` |
+| 11 | **Query / Relational** † | Projection provenance + join witnesses | `RelDelta` or `AmbiguousPutback` |
+| 12 | **Workflow / State-Machine** † | Transition context + rollback plan | Workflow or `InvalidTransition` |
+
+*† Rows 11–12 need extended rungs — see [docs/foundation.md](docs/foundation.md) §1.*
 
 - **Query Focal** (11) is adjacent to Persistence Focal but operates at the relational algebra level (materialized views, BI dashboards). The hard problem is not decomposition but *putback policy* — when a user edits a projection, which base relations should change? This is the view-update problem from bidirectional transformation research.
 
@@ -243,7 +237,7 @@ The library implements ~3.5 of the 12 specializations. The choice is not arbitra
 
 ### What's in scope for the core library
 
-1. **Pure structural decomposition** — `splitF` and `plugF` are total, deterministic functions. The residual is geometric (position, frame stack, segments). No external state, no IO, no database.
+1. **Pure structural decomposition** — `splitF` and `plugF` are total on their declared domains and deterministic; partiality is confined to the registered failure modes ([docs/foundation.md](docs/foundation.md) §4). The residual is geometric (position, frame stack, segments). No external state, no IO, no database.
 
 2. **Fixed-root tree replacement** — the library's strongest result is the zipper fiber: for trees where every reachable vertex has a unique root path, the zipper context is proof-irrelevant (rebuilding is unique). This is the "sweet spot" for Focal's geometric guarantees.
 
@@ -289,15 +283,16 @@ overF (unsafeElementF 2) (*10) [1, 2, 3, 4, 5]  -- → [1, 2, 30, 4, 5]
 let deep = fstF >>> fstF  -- inside ((a, b), c), focus on a
 overF deep show ((42, "x"), True)  -- → (("42", "x"), True)
 
--- Monadic bridge
+-- Functor-level bridge (only `Functor` is required)
 overFM fstF (\x -> putStrLn ("Got: " ++ show x) >> pure (x + 1)) (41, "ok")
 -- prints "Got: 41", returns (42, "ok")
 
--- Zipper (binary tree)
+-- Zipper (binary tree). Snapshot semantics: splitF ignores its argument, and
+-- Nothing covers only the path check against t (see docs/foundation.md §4).
 import Focal.Zipper
 let t  = Node (Node (Leaf 1) (Leaf 2)) (Leaf 3)
     Just f = safeFocusAt [GoLeft, GoRight] t
-overF f (*10) t  -- doubles the right child of the left subtree
+overF f (*10) t  -- multiplies the right child of the left subtree by 10
 ```
 
 ---
@@ -309,6 +304,8 @@ overF f (*10) t  -- doubles the right child of the left subtree
 - **Refocusing in Reduction Semantics** ([BRICS RS-04-26](https://www.brics.dk/RS/04/26/)) — Danvy & Nielsen's fusion of decompose-contract-plug into a single state transition. The Redex Focal specialization directly mirrors this loop.
 - **Bidirectional Transformations** ([arXiv:2502.18954](https://arxiv.org/abs/2502.18954)) — The view-update problem in databases, structured documents, and model transformation. Persistence Focal and Query Focal are the Focal-shaped interface to this research area.
 - **Self-Adjusting Computation** ([CMU](https://www.cs.cmu.edu/~rwh/students/acar.pdf)) — Incremental computation via dependency tracking and change propagation. The Incremental Computation Focal builds on these ideas.
+- **A Representation Theorem for Second-Order Functionals** ([JFP '15](https://doi.org/10.1017/S0956796815000088)) — Jaskelioff & O'Connor's representation theorem for second-order functionals; the Van Laarhoven-form reading of `Focusing` in [docs/foundation.md](docs/foundation.md) §5 rests on it.
+- **(Co)end Calculus** ([arXiv:1501.02503](https://arxiv.org/abs/1501.02503)) — Loregian's treatment of (co)ends and the co-Yoneda lemma; `Focal`'s existential packaging is a coend, characterized extensionally as `S → (A × (B → T))` — see [docs/foundation.md](docs/foundation.md) §5 for the caveats.
 
 ---
 

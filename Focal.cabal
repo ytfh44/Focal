@@ -18,6 +18,8 @@ build-type:     Simple
 extra-source-files:
     README.md
     CHANGELOG.md
+    docs/foundation.md
+    docs/conformance.md
 
 source-repository head
   type: git
