@@ -69,7 +69,7 @@ Depends on: 0a. Done = ① module exported ② rung registered in `docs/foundati
 Depends on: 4, 0c. Done = ① `FocusingE`-based list focus ② `elementAt` landed ③ L-GP/L-PG/L-PP rows green for both list focuses (`elementF` and the `FocusingE` variant). [x]
 
 6. Split out `Focal.Effectful`: define `FocusingM m c s t a b`; unify failure, validation, logging, and stateful reconstruction.
-Depends on: 4. Done = ① module exported ② rung registered ③ witness tests for its laws ④ Store/coend reading re-derived for the `m` codomain; rank re-checked (foundation §5).
+Depends on: 4. Done = ① `Focal.Effectful` exported: `FocusingM(..)`, `idM`, `composeM`, `overM`, `toEffectful`, `toEffectfulE`, `storeM`, `fromStoreM` (all rank ≤ 1) ② rung registered in `docs/foundation.md` §1 ③ law witnesses: the L-GP/L-PG monadic forms green for ≥ 3 instances across distinct monads (logging, partial, state) + composition closure (GP/PG preserved under `composeM`; algebraic proof + probe/exhaustive-sweep evidence) + `prop_discM_*` pins: bare PG fails with effects, PP_M fails for logging and for unconditional partials ④ Store/coend reading: unconditional collapse `∫^C Hom(S, m(A×C)) × Hom(C, B→mT) ≅ Hom(S, m(A×(B→mT)))` documented in §5; rank re-checked.
 
 7a. Normalize residual composition (syntax): `Residual2`, `Residual3`, flatten/unflatten, pretty/debug helpers to avoid long-term exposure of deeply nested pairs.
 Depends on: 1, 4. Done = ① helpers exported ② flatten/unflatten round-trip tests.
