@@ -14,6 +14,7 @@ import Focal.Tuple
 import Focal.List
 import Focal.Zipper
 import Focal.Interop
+import Focal.Partial
 
 main :: IO ()
 main = defaultMain tests
@@ -118,6 +119,32 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
   , testGroup "Edit independence (observation)"
       [ testProperty "independent foci commute" prop_obs_independentFoci
       ]
+  , testGroup "L-GP — partial success domain (FocusingE)"
+      [ testProperty "idE: plug (splitE s) = s" prop_lgpE_idE
+      , testProperty "limitedE: plug (splitE s) = s on the domain" prop_lgpE_limited
+      , testProperty "embedded fstF: plug (splitE pair) = pair" prop_lgpE_embedFstF
+      ]
+  , testGroup "L-PG — partial retrieve (FocusingE)"
+      [ testProperty "limitedE: re-split after plug recovers b" prop_lpgE_limited
+      , testProperty "embedded fstF: re-split after plug recovers b" prop_lpgE_embed
+      ]
+  , testGroup "L-PP — partial overwrite stability (FocusingE)"
+      [ testProperty "limitedE: plug c' b2 = plug c b2 after a successful write" prop_lppE_limited
+      , testProperty "composed limitedE: plug c' b2 = plug c b2 after a successful write" prop_lppE_composed
+      ]
+  , testGroup "L-OVF — partial homomorphism (FocusingE)"
+      [ testProperty "limitedE: overE (g . h) = overE g . overE h on the success prefix" prop_lovfE_prefix
+      ]
+  , testGroup "FocusingE — failure channel (wiring)"
+      [ testProperty "split failure skips the inner stage" prop_scE_splitShortCircuit
+      , testProperty "plug runs inner-to-outer (outer plug skipped on inner failure)" prop_scE_plugOrder
+      , testProperty "toPartial commutes with composeE" prop_embE_compose
+      , testProperty "fromStoreE (toStoreE p) observes like p" prop_storeE_roundtrip
+      ]
+  , testGroup "Law discriminators — partial (FocusingE)"
+      [ testProperty "unconditional PP needs the success premise" prop_discE_ppNeedsSuccess
+      , testProperty "unconditional OVF is false" prop_discE_uncondOVF
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -141,6 +168,53 @@ badViewLens = fromLensLike (const "") (\u v -> u { userFirst = v })
 -- | Index into a non-empty list, drawn from a generated @NonNegative@.
 listIndex :: [Int] -> NonNegative Int -> Int
 listIndex xs (NonNegative n) = n `mod` length xs
+
+--------------------------------------------------------------------
+-- FocusingE fixtures (failure channel)
+--------------------------------------------------------------------
+
+-- | Lawful on its success domain: split and plug reject values outside
+--   @0 <= _ <= cap@.
+limitedE :: Int -> FocusingE String Int Int Int Int Int
+limitedE cap = FocusingE
+  { splitE = \s -> if s < 0 || s > cap
+                    then Left "split out of range"
+                    else Right (s, s)
+  , plugE  = \_ b -> if b < 0 || b > cap
+                      then Left "plug out of range"
+                      else Right b
+  }
+
+-- | Behavioural observation of a partial focus: focus and putback outcome.
+observeE :: FocusingE e c s t a b -> s -> b -> Either e (a, Either e t)
+observeE p s b = fmap (\(a, k) -> (a, k b)) (toStoreE p s)
+
+-- | Failure-wiring fixtures. The @explode*E@ legs crash if evaluated, so the
+--   short-circuit tests fail loudly when the ordering is wrong.
+splitFailE :: FocusingE String () Int Int Int Int
+splitFailE = FocusingE
+  { splitE = \_ -> Left "split-first"
+  , plugE  = \() b -> Right b
+  }
+
+explodeSplitE :: FocusingE String () Int Int Int Int
+explodeSplitE = FocusingE
+  { splitE = \_ -> error "split must not run"
+  , plugE  = \_ _ -> error "plug must not run"
+  }
+
+explodePlugE :: FocusingE String () Int Int Int Int
+explodePlugE = FocusingE
+  { splitE = \s -> Right (s, ())
+  , plugE  = \_ _ -> error "outer plug must not run"
+  }
+
+-- | Inner leg whose plug always fails.
+plugFailE :: FocusingE String () Int Int Int Int
+plugFailE = FocusingE
+  { splitE = \s -> Right (s, ())
+  , plugE  = \() _ -> Left "plug-first"
+  }
 
 --------------------------------------------------------------------
 -- L-GP — Split-plug reconstruction
@@ -710,6 +784,106 @@ prop_obs_independentFoci (xs, ys) =
         applyRsThenLs t = overF fRs (const 77) (overF fLs (const 99) t)
         input = (xs, ys)
     applyLsThenRs input === applyRsThenLs input
+
+--------------------------------------------------------------------
+-- FocusingE — partial channel (success-premise laws)
+--------------------------------------------------------------------
+
+prop_lgpE_idE :: Int -> Bool
+prop_lgpE_idE s = overE idE id s == (Right s :: Either String Int)
+
+prop_lgpE_limited :: Int -> Bool
+prop_lgpE_limited s =
+  case splitE (limitedE 10) s of
+    Left _       -> True
+    Right (a, c) -> plugE (limitedE 10) c a == Right s
+
+prop_lgpE_embedFstF :: (Int, Int) -> Bool
+prop_lgpE_embedFstF p =
+  overE (toPartial fstF) id p == (Right p :: Either String (Int, Int))
+
+prop_lpgE_limited :: Int -> Int -> Bool
+prop_lpgE_limited s b =
+  case splitE (limitedE 10) s of
+    Left _       -> True
+    Right (_, c) -> case plugE (limitedE 10) c b of
+      Left _       -> True
+      Right t      -> case splitE (limitedE 10) t of
+        Right (a', _) -> a' == b
+        Left _        -> False
+
+prop_lpgE_embed :: (Int, Int) -> Int -> Bool
+prop_lpgE_embed p b =
+  let f = toPartial (fstF :: Focusing Int (Int, Int) (Int, Int) Int Int)
+            :: FocusingE String Int (Int, Int) (Int, Int) Int Int
+  in case splitE f p of
+       Left _       -> False
+       Right (_, c) -> case plugE f c b of
+         Left _       -> False
+         Right t      -> case splitE f t of
+           Right (a', _) -> a' == b
+           Left _        -> False
+
+prop_lppE_limited :: Int -> Int -> Int -> Bool
+prop_lppE_limited s b1 b2 =
+  case splitE (limitedE 10) s of
+    Left _       -> True
+    Right (_, c) -> case plugE (limitedE 10) c b1 of
+      Left _          -> True
+      Right t         -> case splitE (limitedE 10) t of
+        Left _        -> False
+        Right (_, c') -> plugE (limitedE 10) c' b2 == plugE (limitedE 10) c b2
+
+prop_lppE_composed :: Int -> Int -> Int -> Bool
+prop_lppE_composed s b1 b2 =
+  let p = composeE (limitedE 10) (limitedE 10)
+  in case splitE p s of
+       Left _       -> True
+       Right (_, c) -> case plugE p c b1 of
+         Left _          -> True
+         Right t         -> case splitE p t of
+           Left _        -> False
+           Right (_, c') -> plugE p c' b2 == plugE p c b2
+
+prop_lovfE_prefix :: Int -> Fun Int Int -> Fun Int Int -> Bool
+prop_lovfE_prefix s fg fh =
+  let p = limitedE 10
+      g = applyFun fg
+      h = applyFun fh
+  in case overE p h s of
+       Left _  -> True
+       Right t -> overE p (g . h) s == overE p g t
+
+prop_scE_splitShortCircuit :: Bool
+prop_scE_splitShortCircuit =
+  overE (composeE splitFailE explodeSplitE) id 0 == Left "split-first"
+
+prop_scE_plugOrder :: Bool
+prop_scE_plugOrder =
+  overE (composeE explodePlugE plugFailE) id 0 == Left "plug-first"
+
+prop_embE_compose :: ((Int, Int), Bool) -> Bool
+prop_embE_compose s =
+  overE (toPartial (fstF >>> sndF)) (+1) s
+    == (overE (composeE (toPartial fstF) (toPartial sndF)) (+1) s
+          :: Either String ((Int, Int), Bool))
+
+prop_storeE_roundtrip :: Int -> Int -> Bool
+prop_storeE_roundtrip s b =
+  observeE (limitedE 10) s b
+    == observeE (fromStoreE (toStoreE (limitedE 10))) s b
+
+prop_discE_ppNeedsSuccess :: Bool
+prop_discE_ppNeedsSuccess =
+  let p = limitedE 10
+  in (overE p (const (-1)) 0 >>= overE p (const 2))
+       /= overE p (const 2) 0
+
+prop_discE_uncondOVF :: Bool
+prop_discE_uncondOVF =
+  let p = limitedE 10
+  in overE p (const 2) 0
+       /= (overE p (const (-1)) 0 >>= overE p (const 2))
 
 --------------------------------------------------------------------
 -- QuickCheck generators

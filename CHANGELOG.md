@@ -25,5 +25,10 @@ and this project adheres to the
   `mkFocal`/`withFocal`; `safeFocusAt`/`unsafeFocusAt` removed; `base` bound
   raised to `>= 4.16`.
 
+- Added `Focal.Partial` (`FocusingE`, `idE`, `composeE`, `overE`, `toPartial`,
+  `toStoreE`, `fromStoreE`): failures in `Either` return values, ordered
+  composition, success-premise laws, partial Store reading. Test suite: 78
+  law-id-tagged properties.
+
 ## 0.1.0.0 - YYYY-MM-DD
 

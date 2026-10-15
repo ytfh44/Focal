@@ -32,6 +32,7 @@ library
       Focal.List
       Focal.Zipper
       Focal.Interop
+      Focal.Partial
   other-modules:
       Lib
       Paths_Focal

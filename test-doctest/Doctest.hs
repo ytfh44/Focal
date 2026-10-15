@@ -10,4 +10,5 @@ main = doctest
   , "src/Focal/List.hs"
   , "src/Focal/Zipper.hs"
   , "src/Focal/Interop.hs"
+  , "src/Focal/Partial.hs"
   ]

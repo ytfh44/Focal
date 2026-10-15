@@ -63,7 +63,7 @@ Depends on: 0b. Done = ① 0b complete ② framework covers every law-id in `doc
 Depends on: 0b. Done = ① every shipped instance appears in the conformance matrix with witnesses or a registered gap. [x]
 
 4. Split out `Focal.Partial`: define `FocusingE e c s t a b`; move failures into `split`/`plug` return values.
-Depends on: 0a. Done = ① module exported ② rung registered in `docs/foundation.md` §1 ③ every throw site re-checked against §4.1 ④ Store/coend reading re-derived for the `Either e` codomain; rank re-checked (foundation §5).
+Depends on: 0a. Done = ① module exported ② rung registered in `docs/foundation.md` §1 ③ every throw site re-checked against §4.1 ④ Store/coend reading re-derived for the `Either e` codomain; rank re-checked (foundation §5). [x]
 
 5. Rewrite the list focus: migrate `elementF` negative-index / out-of-bounds / empty-list cases into `FocusingE` (item 4); retain the total-safe API; add `elementAt` (0c).
 Depends on: 4, 0c. Done = ① `FocusingE`-based list focus ② `elementAt` landed ③ L-GP/L-PG/L-PP rows green for both list focuses (`elementF` and the `FocusingE` variant).

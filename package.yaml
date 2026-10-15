@@ -43,6 +43,7 @@ library:
   - Focal.List
   - Focal.Zipper
   - Focal.Interop
+  - Focal.Partial
 
 executables:
   Focal-exe:
