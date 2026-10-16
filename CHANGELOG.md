@@ -8,6 +8,8 @@ and this project adheres to the
 
 ## Unreleased
 
+## 0.1.0.0 - 2026-10-16
+
 - Documentation layer revision: added `docs/foundation.md` (axiom A-LENS, L0–L6
   hierarchy, law vocabulary, contracts, representation ladder, defect log) and
   `docs/conformance.md` (instance × law matrix); reworked the README law
@@ -69,7 +71,9 @@ and this project adheres to the
   witnesses. Suite at 136 properties.
 
 - Stated the residual representation-equivalence rules in `docs/foundation.md`
-  §5: putback-equivalence as the law-layer residual identity, the
+  §5: putback-equivalence as the law-layer residual identity between independently
+  chosen representations (the definitional pairing conventions being the only
+  other residual identities the laws fix), the
   geometry-vs-putback-function distinction, the admissible-discard rules for
   re-representation, and the registered boundary that no total residual
   minimization exists (function equality is undecidable).
@@ -83,6 +87,4 @@ and this project adheres to the
   `toOptional`): zero-or-one foci where a miss is absence with pass-through
   update — distinct from the failure channel; hit-domain GP/PG/PP plus miss,
   short-circuit, and composition witnesses. Suite at 136 properties.
-
-## 0.1.0.0 - 2026-10-16
 

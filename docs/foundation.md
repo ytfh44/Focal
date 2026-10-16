@@ -301,9 +301,14 @@ instance are *putback-equivalent* when they rebuild identically:
 c1 ~ c2  ⇔  ∀ b. plugF f c1 b == plugF f c2 b
 @
 
-Putback-equivalence is the only residual identity available to the law layer —
-residuals are functions into the target, and function equality is not decidable
-in Haskell, so no residual *value* comparison is sound. Two residuals may be
+Putback-equivalence is the residual identity the law layer uses between
+*independently chosen* residuals — residuals are functions into the target, and
+function equality is not decidable in Haskell, so no general residual *value*
+comparison is sound. Beyond it, the laws fix only the library's own definitional
+pairing conventions — the product `(c1, c2)`, the unit `()`, and the
+reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` that `L-ASSOC` and `L-UNIT` are
+stated modulo — never the identity of an arbitrary residual representation.
+Two residuals may be
 putback-equivalent while carrying different geometry (position, provenance,
 debug information): *residual as geometry* and *residual as putback function*
 are distinct, and the second is the quotient by `~`. Re-representations
