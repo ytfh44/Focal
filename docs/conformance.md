@@ -17,7 +17,7 @@ not an instance (projection).
 | `elementF` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain `0 <= n < length xs`; outside it, delayed `error` from `splitF` | `prop_lgp_list`, `prop_lpg_elementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_elementf_negative` | construction-time full check is `elementAt`; failure-channel variant is `elementE` |
 | `unsafeElementF` | ✓ | ✓ | ✓ | ✓ | ✓ | `0 <= n`; immediate `error` for `n < 0`; delayed `error` for `n >= length xs` | `prop_lgp_list`, `prop_lpg_unsafeElementF`, `prop_lpp_list`, `prop_lovf_list`, `prop_lovf_composed`, `prop_concrete_list` | in-domain behavior identical to `elementF` |
 | `fromZip` | ✓\* | ✗ | ✓† | ✗ | ✗ (exempt) | total; no failure mode | `prop_lgp_roseZip`, `prop_lgp_binZip`, `prop_lpp_fromZip`, `prop_lunit_left_zipper`, `prop_lunit_right_zipper`, `prop_occ_rose`, `prop_occ_binTree`, `prop_zip_multilevel`, `prop_contract_zip_ignoresInput`, `prop_contract_zip_pgCaptured` | **snapshot constructor** (foundation §4.2): `splitF` ignores its argument; snapshot contracts pinned by `prop_contract_zip_*` |
-| `focusAt` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain: trees in which `path` exists; construction returns `Nothing` if the path is absent in the given tree; `splitF` on a later tree lacking the path raises a delayed `error` | `prop_focusat_*` | dynamic (input-invariant); path-validity premise per tree (foundation §2) |
+| `focusAt` | ✓ | ✓ | ✓ | ✓ | ✓ | declared domain: trees in which `path` exists; construction returns `Nothing` if the path is absent in the given tree; `splitF` on a later tree lacking the path raises a delayed `error` | `prop_focusat_*`, `prop_focusatE_*` | dynamic (input-invariant); path-validity premise per tree (foundation §2); failure-channel counterpart `focusAtE` reports the first missing path step as `Left (PathError i)` |
 | `elementAt` | ✓ | ✓ | ✓ | ✓ | ✓ | domain `0 <= n < length xs` of the construction list; `Nothing` otherwise; the returned `Focusing` keeps `elementF`'s delayed error off-domain | `prop_elementat_*` | checked construction-time variant of `elementF` |
 | `elementE` | ✓ | ✓ | ✓ | ✓ | ✓ | no construction failure; `splitE` checks the supplied list: `Left (NegativeIndex n)` for `n < 0`, `Left (PastEnd n)` past the end; `plugE` total | `prop_elementE_*` | failure-channel variant of `elementF`; domain `0 <= n < length xs` re-checked per call |
 | `overFM`, `toStoreLike` | — | — | — | — | — | `overFM`: Functor-level, no law beyond the functor laws; `toStoreLike`: projection | (none — no law claimed) | L-NORM / L-TVL are provided by `Focal.Interop` (shipped) |
@@ -41,24 +41,25 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree (**114 properties**,
+Reviewed property-by-property against the working tree (**119 properties**,
 plus the doctest suite):
 
-- **L-GP: 15 of 114** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
-- **L-PG: 13 of 114** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
-- **L-PP: 9 of 114** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
+- **L-GP: 15 of 119** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
+- **L-PG: 13 of 119** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
+- **L-PP: 9 of 119** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
   one trivially-satisfied snapshot case, `prop_lpp_fromZip`).
-- **L-OVF: 5 of 114** (`prop_lovf_*` — four instances plus the partial
+- **L-OVF: 5 of 119** (`prop_lovf_*` — four instances plus the partial
   success-prefix case).
-- **L-ASSOC: 3 of 114** (`prop_lassoc_*`); **L-UNIT: 6 of 114** (`prop_lunit_*`).
-- **L-NORM: 2 of 114** (`prop_lnorm_*`); **L-TVL: 2 of 114** (`prop_ltvl_*`).
-- **Partial channel: 6 of 114** (`prop_scE_*`, `prop_embE_compose`,
+- **L-ASSOC: 3 of 119** (`prop_lassoc_*`); **L-UNIT: 6 of 119** (`prop_lunit_*`).
+- **L-NORM: 2 of 119** (`prop_lnorm_*`); **L-TVL: 2 of 119** (`prop_ltvl_*`).
+- **Partial channel: 6 of 119** (`prop_scE_*`, `prop_embE_compose`,
   `prop_storeE_roundtrip`, `prop_discE_*`).
-- **`elementE` contract: 7 of 114** (`prop_elementE_*`).
-- **Effectful rung (non-law): 12 of 114** (`prop_compM_*`, `prop_lunitM_*`,
+- **`elementE` contract: 7 of 119** (`prop_elementE_*`).
+- **Effectful rung (non-law): 12 of 119** (`prop_compM_*`, `prop_lunitM_*`,
   `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*`).
-- **Residual shape: 2 of 114** (`prop_flatten_inverse`, `prop_unflatten_inverse`).
-- **Type-changing fragment: 5 of 114** (`prop_tc_*`).
+- **Residual shape: 2 of 119** (`prop_flatten_inverse`, `prop_unflatten_inverse`).
+- **Type-changing fragment: 5 of 119** (`prop_tc_*`).
+- **`focusAtE` contract: 5 of 119** (`prop_focusatE_*`).
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,

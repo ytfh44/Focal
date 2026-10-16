@@ -107,7 +107,7 @@ The core's own mathematics: the laws and interfaces the shipped rungs leave open
 Depends on: 0a, 0b. Done = ① clause forms written in `docs/foundation.md` §3 with side conditions ② ≥ 2 type-changing instances with witnesses (product components; a composed chain) ③ conformance rows updated. [x]
 
 34. Dynamic failure channel — `focusAtE`: path focus whose invalidity at split time travels in the return channel (no deferred `error` for the caller).
-Depends on: 0d, 4. Done = ① `focusAtE` exported (rank ≤ 1), per-call path validation ② tests: valid domain, off-tree path, path absent in a later tree ③ conformance row + §4.1 exemption narrowed.
+Depends on: 0d, 4. Done = ① `focusAtE` exported (rank ≤ 1), per-call path validation ② tests: valid domain, off-tree path, path absent in a later tree ③ conformance row + §4.1 exemption narrowed. [x]
 
 35. Residual representation-equivalence rules: formalize when two residuals are interchangeable — putback-equivalence (`∀b. plugF f c1 b = plugF f c2 b`) versus geometry retention — and what re-representation may discard.
 Depends on: 0e, 7b. Done = ① boundary stated in §5 (function equality is not decidable; no total residual minimization) ② admissible-discard rules for `normalize`/re-representation ③ checkable rules get witnesses; the rest registered as gaps.

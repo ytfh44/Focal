@@ -34,6 +34,8 @@ module Focal.Zipper
     -- * Bridge to Focusing
   , fromZip
   , focusAt
+  , focusAtE
+  , PathError(..)
     -- * Shipped instances
   , BinTree(..)
   , BinFrame(..)
@@ -43,6 +45,7 @@ module Focal.Zipper
   ) where
 
 import Focal.Core (Focusing(..))
+import Focal.Partial (FocusingE(..))
 
 -- ---------------------------------------------------------------------------
 -- Core class
@@ -159,6 +162,40 @@ focusAt path t =
             Nothing -> error "focusAt: path not found in the supplied tree"
       , plugF = \ctx b -> rebuild b ctx
       }
+
+-- ---------------------------------------------------------------------------
+-- Failure-channel dynamic focus
+-- ---------------------------------------------------------------------------
+
+-- | Failure channel for dynamic path navigation: @'PathError' i@ carries the
+--   0-based index of the first path step that cannot be taken.
+newtype PathError = PathError Int
+  deriving (Eq, Show)
+
+-- | Failure-channel counterpart of 'focusAt'. Construction never fails:
+--   @splitE@ re-navigates the supplied tree on every call and reports the
+--   first step that cannot be taken as @Left ('PathError' i)@ with @i@
+--   0-based; the empty path succeeds at the root of every tree. @plugE@ is
+--   total, @plugE ctx b = Right (rebuild b ctx)@; no deferred 'error'.
+--
+--   >>> import Focal.Partial (splitE)
+--   >>> let r = Rose 1 [Rose 2 [], Rose 3 [Rose 4 []]]
+--   >>> fmap fst (splitE (focusAtE [1, 0]) r)
+--   Right (Rose 4 [])
+--   >>> splitE (focusAtE [1, 2]) r
+--   Left (PathError 1)
+focusAtE :: ZipTree t => [Child t] -> FocusingE PathError [Frame t] t t t t
+focusAtE path = FocusingE
+  { splitE = \t -> case step 0 path (rootZip t) of
+      Left i  -> Left (PathError i)
+      Right z -> Right (current z, context z)
+  , plugE  = \ctx b -> Right (rebuild b ctx)
+  }
+  where
+    step _ []       z = Right z
+    step i (c : cs) z = case down c z of
+      Nothing -> Left i
+      Just z' -> step (i + 1) cs z'
 
 -- ---------------------------------------------------------------------------
 -- Binary tree

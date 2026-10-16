@@ -195,6 +195,13 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "sndF: plug form" prop_tc_sndF_plug
       , testProperty "composed chain: overF show" prop_tc_composed
       ]
+  , testGroup "focusAtE — failure-channel dynamic focus (ROADMAP 34)"
+      [ testProperty "valid path extracts the child" prop_focusatE_validPath
+      , testProperty "path not takeable: Left (PathError i)" prop_focusatE_offTree
+      , testProperty "path absent in a later tree: Left (PathError i)" prop_focusatE_laterMissing
+      , testProperty "GP on the success domain" prop_focusatE_gp
+      , testProperty "plugE ctx b = Right (rebuild b ctx)" prop_focusatE_plug
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -1203,6 +1210,65 @@ prop_tc_composed n x c =
   overF tcComposed show (n, (x, c)) == (n, (show x, c))
 
 --------------------------------------------------------------------
+-- focusAtE — failure-channel dynamic focus (ROADMAP 34)
+--------------------------------------------------------------------
+
+-- | Number of leading path steps that can be taken in the supplied tree.
+--   When the path does not exist in the tree this is the 0-based index of
+--   the first failing step.
+validPrefix :: [Int] -> Rose Int -> Int
+validPrefix p t = go 0 p (rootZip t)
+  where
+    go i []       _ = i
+    go i (c : cs) z = case down c z of
+      Nothing -> i
+      Just z' -> go (i + 1) cs z'
+
+prop_focusatE_validPath :: Rose Int -> Property
+prop_focusatE_validPath t =
+  forAll (genPathIn t) $ \p ->
+    case safeNavigate p t of
+      Nothing -> property False
+      Just z  ->
+        splitE (focusAtE p) t === Right (current z, context z)
+
+prop_focusatE_offTree :: Rose Int -> Property
+prop_focusatE_offTree t =
+  forAll (genOffTreePath t) $ \p ->
+    isNothing (safeNavigate p t) ==>
+      splitE (focusAtE p) t
+        === (Left (PathError (validPrefix p t))
+              :: Either PathError (Rose Int, [RoseFrame Int]))
+
+prop_focusatE_laterMissing :: Rose Int -> Property
+prop_focusatE_laterMissing t@(Rose _ kids) =
+  not (null kids) ==>
+    case focusAt [0 :: Int] t of
+      Nothing -> property False
+      Just _  ->
+        splitE (focusAtE [0 :: Int]) (Rose (0 :: Int) [])
+          === (Left (PathError 0) :: Either PathError (Rose Int, [RoseFrame Int]))
+
+prop_focusatE_gp :: Rose Int -> Rose Int -> Property
+prop_focusatE_gp (Rose _ kids0) t1 =
+  not (null kids0) ==>
+    let f = focusAtE [0 :: Int]
+              :: FocusingE PathError [RoseFrame Int] (Rose Int) (Rose Int) (Rose Int) (Rose Int)
+    in case splitE f t1 of
+         Left _       -> property True
+         Right (a, c) -> plugE f c a === Right t1
+
+prop_focusatE_plug :: Rose Int -> Rose Int -> Property
+prop_focusatE_plug t b =
+  forAll (genPathIn t) $ \p ->
+    case safeNavigate p t of
+      Nothing -> property False
+      Just z  ->
+        let f = focusAtE []
+                  :: FocusingE PathError [RoseFrame Int] (Rose Int) (Rose Int) (Rose Int) (Rose Int)
+        in plugE f (context z) b === Right (rebuild b (context z))
+
+--------------------------------------------------------------------
 -- QuickCheck generators
 --------------------------------------------------------------------
 
@@ -1248,3 +1314,33 @@ genBinWithDup = do
       [ Leaf <$> arbitrary
       , Node <$> go (n `div` 2) <*> go (n `div` 2)
       ]
+
+-- | Generate a path of child selections that exists in the supplied Rose tree
+--   (a leaf yields the empty path, valid at the root).
+genPathIn :: Rose Int -> Gen [Int]
+genPathIn (Rose _ kids)
+  | null kids = pure []
+  | otherwise = do
+      k <- chooseInt (0, length kids - 1)
+      rest <- genPathIn (kids !! k)
+      pure (k : rest)
+
+-- | Generate a path that cannot be taken in the supplied Rose tree: some
+--   (possibly empty) valid prefix, then one child selection that is out of
+--   range (negative or @>= length kids@). The failing 0-based index is the
+--   number of valid steps.
+genOffTreePath :: Rose Int -> Gen [Int]
+genOffTreePath = go []
+  where
+    go acc (Rose _ kids) = do
+      extend <- if null kids then pure False else arbitrary
+      if extend
+        then do
+          k <- chooseInt (0, length kids - 1)
+          go (k : acc) (kids !! k)
+        else do
+          negative <- arbitrary
+          bad <- if negative
+                   then chooseInt (-1 - length kids, -1)
+                   else chooseInt (length kids, length kids + 1)
+          pure (reverse (bad : acc))
