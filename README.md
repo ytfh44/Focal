@@ -135,7 +135,7 @@ Both legs live in a monad `m`: failures (`m = Either e`), validation, logging
 (`m = Writer`), and stateful reconstruction (`m = State`). `FocusingE` is the
 `m = Either e` case (`toEffectfulE`); a pure `Focusing` embeds by purity
 (`toEffectful`). GP/PG hold as Kleisli equations and are preserved by
-`composeM` for every monad; PP is per instance (replay-sensitive).
+`composeM` for every monad; PP holds per instance in the replay-prefix form.
 
 ---
 
@@ -173,7 +173,7 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 
 ### Coverage
 
-The test suite has **105 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
+The test suite has **107 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 

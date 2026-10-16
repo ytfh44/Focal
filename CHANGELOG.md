@@ -37,8 +37,15 @@ and this project adheres to the
 - Added `Focal.Effectful` (`FocusingM`, `idM`, `composeM`, `overM`,
   `toEffectful`, `toEffectfulE`, `storeM`, `fromStoreM`): both legs in a monad
   (failure, validation, logging, state); GP/PG as Kleisli equations, preserved
-  by composition for every monad; PP per instance. Test suite: 105
+  by composition for every monad; PP per instance. Test suite: 107
   law-id-tagged properties.
+
+- Tightened the effectful PP statement to the replay-prefix equation (the
+  first write is shared, so failures short-circuit together and no success
+  premise is needed); discriminators extended (logging and sign-flipping
+  residuals fail it; the prefix-less strengthening stays pinned as false).
+  Law tables now count the effectful witnesses: 107 properties; the module
+  haddock and README phrasing use the replay-prefix wording.
 
 ## 0.1.0.0 - YYYY-MM-DD
 

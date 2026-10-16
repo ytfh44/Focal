@@ -6,8 +6,8 @@
 --   logging (@m = Writer@), and stateful reconstruction (@m = State@).
 --
 --   Composition is ordered — 'splitM' runs outer to inner, 'plugM' inner to
---   outer, and bind sequences the effects. Laws carry success or effect
---   premises (docs/foundation.md §3).
+--   outer, and bind sequences the effects. Laws are Kleisli equations; PP
+--   holds per instance in the replay-prefix form (docs/foundation.md §3).
 module Focal.Effectful
   ( FocusingM(..)
   , idM

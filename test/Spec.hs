@@ -165,8 +165,8 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "absM: PG (continuation form)" prop_lpgM_abs
       , testProperty "checkedM: PG (continuation form)" prop_lpgM_checked
       , testProperty "restoreM: PG (continuation form, all states)" prop_lpgM_restore
-      , testProperty "restoreM: PP (replay-insensitive)" prop_lppM_restore
-      , testProperty "checkedM: PP conditional on a successful write" prop_lppM_checked
+      , testProperty "restoreM: PP (replay-prefix form)" prop_lppM_restore
+      , testProperty "checkedM: PP (replay-prefix form)" prop_lppM_checked
       ]
   , testGroup "FocusingM — composition, unit, embedding, store"
       [ testProperty "GP preserved: composeM logM logM" prop_compM_gp_log
@@ -179,8 +179,10 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       ]
   , testGroup "Law discriminators — effectful (FocusingM)"
       [ testProperty "bare PG (effects must vanish) is false" prop_discM_barePg
-      , testProperty "PP fails for logging (replay is observable)" prop_discM_ppLog
-      , testProperty "PP fails unconditionally for partial plugs" prop_discM_ppPartial
+      , testProperty "prefix-less PP is false with effects (logM)" prop_discM_ppLog
+      , testProperty "prefix-less PP is false for partial plugs" prop_discM_ppPartial
+      , testProperty "replay-prefix PP is false for logging" prop_discM_ppReplayLog
+      , testProperty "replay-prefix PP is false for sign-flipping residuals" prop_discM_ppReplayAbs
       ]
   ]
 
@@ -1070,16 +1072,13 @@ prop_lpgM_restore c b =
 
 prop_lppM_restore :: Bool -> Int -> Int -> Bool
 prop_lppM_restore c b1 b2 =
-  stEqM (do t <- plugM restoreM c b1; (_, c') <- splitM restoreM t; plugM restoreM c' b2)
-        (plugM restoreM c b2)
+  stEqM (do _ <- plugM restoreM c b1; plugM restoreM c b2)
+        (do t <- plugM restoreM c b1; (_, c') <- splitM restoreM t; plugM restoreM c' b2)
 
-prop_lppM_checked :: Int -> Int -> Int -> Property
+prop_lppM_checked :: Int -> Int -> Int -> Bool
 prop_lppM_checked c b1 b2 =
-  case plugM checkedM c b1 of
-    Left _        -> property True
-    Right t       -> case splitM checkedM t of
-      Left _        -> property False
-      Right (_, c') -> plugM checkedM c' b2 === plugM checkedM c b2
+  (do _ <- plugM checkedM c b1; plugM checkedM c b2)
+    == (do t <- plugM checkedM c b1; (_, c') <- splitM checkedM t; plugM checkedM c' b2)
 
 --------------------------------------------------------------------
 -- FocusingM — composition, unit, embedding, store
@@ -1138,6 +1137,16 @@ prop_discM_ppPartial :: Bool
 prop_discM_ppPartial =
   (do t <- plugM checkedM 0 (-1); (_, c') <- splitM checkedM t; plugM checkedM c' 5)
     /= plugM checkedM 0 5
+
+prop_discM_ppReplayLog :: Bool
+prop_discM_ppReplayLog =
+  (do _ <- plugM logM 0 1; plugM logM 0 3)
+    /= (do t <- plugM logM 0 1; (_, c') <- splitM logM t; plugM logM c' 3)
+
+prop_discM_ppReplayAbs :: Bool
+prop_discM_ppReplayAbs =
+  (do _ <- plugM absM (-2) 0; plugM absM (-2) 1)
+    /= (do t <- plugM absM (-2) 0; (_, c') <- splitM absM t; plugM absM c' 1)
 
 --------------------------------------------------------------------
 -- QuickCheck generators

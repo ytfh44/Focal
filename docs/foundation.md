@@ -139,14 +139,14 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 11 of 105: `prop_lgp_*`, partial `prop_lgpE_*`; effectful `prop_lgpM_*` |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 9 of 105: `prop_lpg_*`, partial `prop_lpgE_*`; effectful `prop_lpgM_*` |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 7 of 105: `prop_lpp_*`, partial `prop_lppE_*`; effectful per instance `prop_lppM_*` (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 105: `prop_lovf_*` (four instances plus the partial success-prefix case) |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 105: `prop_lassoc_*` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 105: `prop_lunit_*` |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 105: `prop_lnorm_*` |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 105: `prop_ltvl_*` |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 107: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 107: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 107: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 107: `prop_lovf_*` (four instances plus the partial success-prefix case) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 107: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 107: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 107: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 107: `prop_ltvl_*` |
 | definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
@@ -173,11 +173,15 @@ read as Kleisli equations: **GP** — `splitM f s >>= \ (a, c) -> plugM f c a
 `plugM f c b >>= \ t -> splitM f t >>= \ (a', c') -> k t (a', c') a'` equals
 the same with the pair's observation `a'` replaced by `b` (the effects of the
 plug and of the re-split appear on both sides; the bare form demanding
-`return b` is false with effects — `prop_discM_barePg`); **PP** — the replay
-equation `plugM f c b1 >>= \ t -> splitM f t >>= \ (_, c') -> plugM f c' b2
-= plugM f c b2` is **not universal**: it fails for logging
-(`prop_discM_ppLog`) and for partial plugs without a success premise
-(`prop_discM_ppPartial`), and holds per instance (`prop_lppM_*`).
+`return b` is false with effects — `prop_discM_barePg`); **PP** — the replay-prefix equation:
+`plugM f c b1 >>= \_ -> plugM f c b2` equals `plugM f c b1 >>= \ t ->
+splitM f t >>= \ (_, c') -> plugM f c' b2` (the first write is shared, so
+failures short-circuit together and no success premise is needed). It is
+**not universal** — it fails for logging (`prop_discM_ppReplayLog`) and for
+sign-flipping residuals (`prop_discM_ppReplayAbs`) — and holds per instance
+(`prop_lppM_checked`, `prop_lppM_restore`); the stronger prefix-less form
+(`… = plugM f c b2`) is false with effects (`prop_discM_ppLog`) and for
+partial plugs (`prop_discM_ppPartial`).
 **Composition closure:** GP and PG are preserved under 'composeM' for every
 monad — bind associativity plus the component laws, no commutativity needed —
 witnessed by `prop_compM_*` and an exhaustive small-universe sweep.
