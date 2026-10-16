@@ -35,6 +35,7 @@ library
       Focal.Partial
       Focal.Effectful
       Focal.Generic
+      Focal.Optional
   other-modules:
       Lib
       Paths_Focal

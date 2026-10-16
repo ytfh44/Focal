@@ -119,7 +119,7 @@ Depends on: 1. Done = ① mechanism decision recorded ② derivation implemented
 Depends on: 0d. Done = ① operations exported on `Focal.Zipper` ② round-trip, composition, and LCA laws with witnesses ③ conformance rows; `XC` narrowed or discharged. [x]
 
 38. Zero-or-one focus (optional cardinality): an interface whose split may find no focus, with miss pass-through semantics (update on a miss is identity) — distinct from the failure channel; state its laws.
-Depends on: 0a, 4. Done = ① interface + laws in §3 ② witnesses ③ rank and boundary registered (Prism/Affine reading).
+Depends on: 0a, 4. Done = ① interface + laws in §3 ② witnesses ③ rank and boundary registered (Prism/Affine reading). [x]
 
 Tracked elsewhere (closure layer): canonical residual products (`7a`); law-reuse infrastructure (`0f`); typed/indexed syntax (`9`–`11`); heterogeneous dissection (`M-3`); multi-focus merge including multi-edit commutation/conflict (`M-1`); DAG occurrence→vertex quotient (`M-2`); residual survival and reindexing (`18`–`20`); nominal `FocalE`/`FocalM` seals stay trigger-based (no consumers; §5 note); effect-law verdicts and GP/PG composition closure ship with item 6.
 

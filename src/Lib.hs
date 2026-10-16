@@ -15,6 +15,7 @@
 --   * "Focal.Partial" — 'FocusingE', 'composeE', 'overE', 'toStoreE'
 --   * "Focal.Effectful" — 'FocusingM', 'composeM', 'overM', 'storeM'
 --   * "Focal.Generic" — 'Derivative1', 'genericSplit1', 'genericFocus'
+--   * "Focal.Optional" — 'FocusingO', 'composeO', 'overO'
 module Lib
   ( module Focal.Core
   , module Focal.Tuple
@@ -24,6 +25,7 @@ module Lib
   , module Focal.Partial
   , module Focal.Effectful
   , module Focal.Generic
+  , module Focal.Optional
   ) where
 
 import Focal.Core
@@ -34,3 +36,4 @@ import Focal.Interop
 import Focal.Partial
 import Focal.Effectful
 import Focal.Generic
+import Focal.Optional

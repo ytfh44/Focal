@@ -17,6 +17,7 @@ import Focal.List
 import Focal.Zipper
 import Focal.Interop
 import Focal.Partial
+import Focal.Optional
 import Focal.Effectful
 import Focal.Generic (Derivative1(..), genericFocus, genericPlug1, genericSplit1)
 
@@ -219,6 +220,14 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "roseGeneric: PG (re-split recovers b)" prop_gen_rose_pg
       , testProperty "roseGeneric: PP (plug c' b2 = plug c b2)" prop_gen_rose_pp
       ]
+  , testGroup "Optional focus — zero-or-one (ROADMAP 38)"
+      [ testProperty "miss: overO is pass-through (miss short-circuits)" prop_opt_miss
+      , testProperty "hit: overO updates the head" prop_opt_hit
+      , testProperty "GP on the hit domain" prop_opt_gp
+      , testProperty "PG after a hit split" prop_opt_pg
+      , testProperty "PP after a hit split" prop_opt_pp
+      , testProperty "composed with an always-hit stage" prop_opt_compose
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -289,6 +298,21 @@ plugFailE = FocusingE
   { splitE = \s -> Right (s, ())
   , plugE  = \() _ -> Left "plug-first"
   }
+
+--------------------------------------------------------------------
+-- Optional fixtures (zero-or-one)
+--------------------------------------------------------------------
+
+-- | List-head optional focus: the miss case is the empty list.
+headO :: FocusingO [Int] [Int] [Int] Int Int
+headO = FocusingO
+  { splitO = \xs -> case xs of { (x:_) -> Just (x, xs); _ -> Nothing }
+  , plugO  = \xs y -> case xs of { (_:rest) -> y : rest; [] -> [] }
+  }
+
+-- | Two-stage composition with a always-hit stage.
+headCompO :: FocusingO ([Int], ()) [Int] [Int] Int Int
+headCompO = composeO headO (toOptional (idF :: Focusing () Int Int Int Int))
 
 --------------------------------------------------------------------
 -- FocusingM fixtures (effectful rebuild)
@@ -1379,6 +1403,47 @@ prop_gen_rose_pp t b1 b2 =
   let (_, c)  = splitF roseGeneric t
       (_, c') = splitF roseGeneric (plugF roseGeneric c b1)
   in plugF roseGeneric c' b2 == plugF roseGeneric c b2
+
+--------------------------------------------------------------------
+-- Optional focus — zero-or-one (ROADMAP 38)
+--------------------------------------------------------------------
+
+-- | A miss has defined behavior: pass-through, for both the bare and the
+--   composed focus (the composed miss comes from the first stage).
+prop_opt_miss :: Fun Int Int -> Bool
+prop_opt_miss fh =
+  overO headO (applyFun fh) [] == []
+    && overO headCompO (applyFun fh) [] == []
+
+prop_opt_hit :: Int -> [Int] -> Fun Int Int -> Bool
+prop_opt_hit x xs fh =
+  overO headO (applyFun fh) (x : xs) == applyFun fh x : xs
+
+prop_opt_gp :: Int -> [Int] -> Bool
+prop_opt_gp x xs =
+  case splitO headO (x : xs) of
+    Just (a, c) -> plugO headO c a == x : xs
+    Nothing     -> False
+
+prop_opt_pg :: Int -> [Int] -> Int -> Bool
+prop_opt_pg x xs y =
+  case splitO headO (x : xs) of
+    Just (_, c) -> case splitO headO (plugO headO c y) of
+      Just (a', _) -> a' == y
+      Nothing      -> False
+    Nothing -> False
+
+prop_opt_pp :: Int -> [Int] -> Int -> Int -> Bool
+prop_opt_pp x xs b1 b2 =
+  case splitO headO (x : xs) of
+    Just (_, c) -> case splitO headO (plugO headO c b1) of
+      Just (_, c') -> plugO headO c' b2 == plugO headO c b2
+      Nothing      -> False
+    Nothing -> False
+
+prop_opt_compose :: Int -> [Int] -> Fun Int Int -> Bool
+prop_opt_compose x xs fh =
+  overO headCompO (applyFun fh) (x : xs) == applyFun fh x : xs
 
 --------------------------------------------------------------------
 -- QuickCheck generators

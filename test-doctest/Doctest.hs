@@ -13,4 +13,5 @@ main = doctest
   , "src/Focal/Partial.hs"
   , "src/Focal/Effectful.hs"
   , "src/Focal/Generic.hs"
+  , "src/Focal/Optional.hs"
   ]
