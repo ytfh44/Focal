@@ -4,6 +4,17 @@ Law and contract vocabulary: [`docs/foundation.md`](docs/foundation.md)
 (axiom A-LENS, L0–L6 hierarchy, law-ids). Per-instance verdicts:
 [`docs/conformance.md`](docs/conformance.md).
 
+Work is layered by the semantics it adds. The **closure layers** — legitimacy
+(laws, type-change, partiality, effects, representation) and the structure
+algebra (derivatives, dissection, indexed syntax, focus cardinality, sharing) —
+carry the core's own mathematics and take priority (§0.9): new items `33`–`38`
+(P2), plus closure work already homed elsewhere (`7a`, `0f`, `9`–`11`,
+`18`–`20`, `M-1`–`M-3`). The **interpreter layers** — redex, refactoring,
+incremental computation, parser, query, workflow (P3 `12`–`17`, P4 `21`–`22`,
+P5) — consume the core as a structural interface; their domain rules are not
+derivable from `split`/`plug` (§0.8). Item ids are append-only and need not
+follow section order (§0.10).
+
 ## 0. Engineering constraints
 
 Standing constraints — checked at every review; they have no completion state.
@@ -21,6 +32,12 @@ Standing constraints — checked at every review; they have no completion state.
 0.6. The partiality policy and input invariance are instance-admission conditions (`docs/foundation.md` §4); any exemption must be registered in `docs/conformance.md`.
 
 0.7. Axiom / definitional identity / corollary / theorem classification is authoritative only in `docs/foundation.md`; this file carries engineering constraints and scheduling.
+
+0.8. **Core-entry discipline.** A capability enters the core iff its semantics is primarily determined by explicit residuals and the focus laws; domain rules — evaluation strategies, validation policies, transaction/rollback semantics, parse/query resolution, workflow transitions — live in extension packages that use the core as a structural interface. New optics abstractions enter the core only when explicit residuals must be preserved or manipulated.
+
+0.9. **Closure-first priority.** Closure work (P2 and the closure items homed elsewhere) takes precedence over the interpreter items (P3 `12`–`17`, P4 `21`–`22`, P5); an interpreter item goes ahead of an unblocked closure item only when a concrete use case requires it.
+
+0.10. **Append-only ids.** Item ids are never renumbered — they are cited from `docs/foundation.md`, `test/Spec.hs`, and CHANGELOG entries, and `§0` is cited from README and foundation. New items continue the sequence regardless of the section they belong to, and splits use letter suffixes (`7a`, `7b`).
 
 ---
 
@@ -82,7 +99,33 @@ Depends on: 0a–0e, 0g, 1–7b (0f is trigger-based — it does not gate the re
 
 ---
 
-## P2 — Typed syntax, redex, refactoring (items 9–17)
+## P2 — Semantic closure (items 33–38)
+
+The core's own mathematics: the laws and interfaces the shipped rungs leave open, plus the structure algebra. These items extend the core beyond the 0.1 freeze — they do not gate item 8. Closure work already homed elsewhere is cross-referenced at the end of this section.
+
+33. Type-changing law suite: state the A-LENS clause forms for `s ≠ t` / `a ≠ b` with their side conditions, closing the gap between the five-parameter interface and the mono §3 statements.
+Depends on: 0a, 0b. Done = ① clause forms written in `docs/foundation.md` §3 with side conditions ② ≥ 2 type-changing instances with witnesses (product components; a composed chain) ③ conformance rows updated.
+
+34. Dynamic failure channel — `focusAtE`: path focus whose invalidity at split time travels in the return channel (no deferred `error` for the caller).
+Depends on: 0d, 4. Done = ① `focusAtE` exported (rank ≤ 1), per-call path validation ② tests: valid domain, off-tree path, path absent in a later tree ③ conformance row + §4.1 exemption narrowed.
+
+35. Residual representation-equivalence rules: formalize when two residuals are interchangeable — putback-equivalence (`∀b. plugF f c1 b = plugF f c2 b`) versus geometry retention — and what re-representation may discard.
+Depends on: 0e, 7b. Done = ① boundary stated in §5 (function equality is not decidable; no total residual minimization) ② admissible-discard rules for `normalize`/re-representation ③ checkable rules get witnesses; the rest registered as gaps.
+
+36. Generic one-hole contexts: derive residuals/frames for algebraic datatypes instead of hand-writing one family at a time (generics or codegen — decide and record).
+Depends on: 1. Done = ① mechanism decision recorded ② derivation implemented ③ ≥ 1 existing family migrated with GP/PG/PP witnesses green ④ rung/registration in `docs/foundation.md`.
+
+37. Navigation algebra: path↔frame-stack conversion, path composition, lowest common ancestor, invalid-path semantics — formalizes the `XC` boundary (README note) where child selection must be decidable.
+Depends on: 0d. Done = ① operations exported on `Focal.Zipper` ② round-trip, composition, and LCA laws with witnesses ③ conformance rows; `XC` narrowed or discharged.
+
+38. Zero-or-one focus (optional cardinality): an interface whose split may find no focus, with miss pass-through semantics (update on a miss is identity) — distinct from the failure channel; state its laws.
+Depends on: 0a, 4. Done = ① interface + laws in §3 ② witnesses ③ rank and boundary registered (Prism/Affine reading).
+
+Tracked elsewhere (closure layer): canonical residual products (`7a`); law-reuse infrastructure (`0f`); typed/indexed syntax (`9`–`11`); heterogeneous dissection (`M-3`); multi-focus merge including multi-edit commutation/conflict (`M-1`); DAG occurrence→vertex quotient (`M-2`); residual survival and reindexing (`18`–`20`); nominal `FocalE`/`FocalM` seals stay trigger-based (no consumers; §5 note); effect-law verdicts and GP/PG composition closure ship with item 6.
+
+---
+
+## P3 — Typed syntax, redex, refactoring (items 9–17)
 
 9. Establish `focal-syntax`: typed AST examples, sort kinds, GADT nodes, typed paths.
 Depends on: 8. Done = ① modules + example AST ② rung registered in `docs/foundation.md` §1.
@@ -96,7 +139,7 @@ Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② wi
 12. Establish `focal-redex`: term, value, redex, evaluation context, contract.
 Depends on: 10. Done = ① modules + docs ② rung registered.
 
-13. Implement Redex Focal: `decompose :: Term -> Either Value (Redex, EvalCtx)`, `plug`/`contract`/`step`, forming a decompose-contract-plug loop. Note: `plug` here is not structural rebuild — it must register through an extended rung (`FocusingE`/`FocusingM` or a new one) before any law claim.
+13. Implement Redex Focal: `decompose :: Term -> Either Value (Redex, EvalCtx)`, `plug`/`contract`/`step`, forming a decompose-contract-plug loop where `step = plug (E, contract r)`. The law-bearing direction is the context fill `plug (E, r) = t`; `contract` and the strategy stay in the evaluation layer — a `plug` that contracts breaks GP. `plug` registers through an extended rung (`FocusingE`/`FocusingM` or a new one) before any law claim.
 Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-after-decompose witness.
 
 14. Add laws for Redex Focal: plug-after-decompose, deterministic strategy, step preserves well-typedness.
@@ -113,7 +156,7 @@ Depends on: 16. Done = ① operations implemented ② round-trip tests per opera
 
 ---
 
-## P3 — Delta and incrementality (items 18–22)
+## P4 — Delta and incrementality (items 18–22)
 
 18. Establish `focal-delta`: `Delta`, survival witness, reindexing witness, conflict type.
 Depends on: 8. Done = ① modules + docs ② law-ids registered if claimed.
@@ -132,7 +175,9 @@ Depends on: 21. Done = ① implementation ② invalidation tests.
 
 ---
 
-## P4 — Domain specializations (items 23–30)
+## P5 — Domain specializations (items 23–30)
+
+These frameworks interpret the core. Their domain rules — validation policies, transaction semantics, ambiguity and query resolution, workflow transitions — are not derivable from `split`/`plug` and stay outside it (§0.8); they follow the closure layer in priority (§0.9).
 
 23. Establish `focal-form`: widget path, model snapshot, validation context, field residual.
 Depends on: 6, 19. Done = ① modules + docs.
@@ -160,7 +205,7 @@ Depends on: 29. Done = ① implementation ② transition tests.
 
 ---
 
-## P5 — Cross-package consistency and release (items 31–32)
+## P6 — Cross-package consistency and release (items 31–32)
 
 31. Cross-package consistency tests: core, syntax, redex, refactor, delta, incremental, form, parser, query, and workflow share the frozen law-id vocabulary; each package's conformance suite cites `docs/foundation.md` §3 law-ids.
 Depends on: 8–30. Done = ① suite runs against frozen law-ids ② every package registers its verdicts.
@@ -172,8 +217,10 @@ Depends on: 31. Done = ① release published ② README/conformance reflect the 
 
 ## Research items (unscheduled)
 
+The open mathematical questions: legitimacy and type-change (items 33, 35); residual generalization (item 36, M-3); focus cardinality and merge (item 38, M-1); identity survival under structural change (items 18–20, M-2). Taken up when their trigger fires.
+
 M-1. Multi-focus residual merge semantics.
-Depends on: —. Trigger: multi-focus work is scheduled (§0.3). Done = ① design note with invariants ② law-ids registered in `docs/foundation.md` §3 ③ rank/coend re-derivation (merge is not a product — the shipped composition argument does not transfer).
+Depends on: —. Trigger: multi-focus work is scheduled (§0.3). Done = ① design note with invariants (including commutation for independent edits and conflict semantics for overlapping ones) ② law-ids registered in `docs/foundation.md` §3 ③ rank/coend re-derivation (merge is not a product — the shipped composition argument does not transfer).
 
 M-2. DAG occurrence → vertex quotient (the `XE` boundary).
 Depends on: —. Trigger: the `XE` boundary becomes load-bearing (a shared-subterm traversal is scheduled). Done = ① quotient construction, or a documented impossibility ② conformance exemption updated.
@@ -183,3 +230,9 @@ Depends on: —. Trigger: a type-changing (heterogeneous) residual use case appe
 
 M-4. `Focal` → `focal-core` multi-package mechanism.
 Depends on: —. Trigger: the item-8 release line (the mechanism is needed before publishing). Done = ① mechanism decided (packages, versioning) ② items 1 and 0e updated accordingly.
+
+M-5. Heterogeneous error composition: allow `composeE` across distinct error types with origin-preserving injections (`e1 + e2`), or record the single-`e` policy as final.
+Depends on: —. Trigger: a composition spanning two distinct error types appears. Done = ① decision (injection API vs single-`e` policy) ② if adopted: origin-preservation witnesses + conformance row.
+
+M-6. Law-committed instances (trusted construction): decide whether law commitment travels in types (a certificate wrapper around `Focusing`) or stays a documented assume–guarantee obligation.
+Depends on: —. Trigger: a consumer must accept only law-committed instances. Done = ① decision recorded in §2/§4 ② if a wrapper is adopted: trusted constructor + admission tests.
