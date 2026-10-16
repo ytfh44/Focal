@@ -70,7 +70,7 @@ Depends on: 0b, 0c. Done = ① CI fails on failing doctests ② test output prin
 
 ## P1 — Core package and hardening (items 1–8)
 
-1. Establish the `focal-core` package boundary. Exports follow the current modules (`src/Focal/Core.hs` et al.); the encapsulation decision for `Focal` is tracked in 0e.
+1. Establish the `focal-core` package boundary. Exports follow the current modules (`src/Focal/Core.hs` et al.); the package is named `focal-core` while modules keep the `Focal.*` namespace; the encapsulation decision for `Focal` is tracked in 0e.
 Depends on: 0a. Done = ① export list documented ② no module exports undocumented internals ③ 0e decision recorded. [x]
 
 2. Establish the law-testing framework. Subsumed by 0b (tests rewritten by law-id).
