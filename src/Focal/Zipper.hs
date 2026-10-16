@@ -31,6 +31,10 @@ module Focal.Zipper
   , up
   , down
   , safeNavigate
+    -- * Navigation algebra
+  , pathOf
+  , framesAt
+  , lcaPath
     -- * Bridge to Focusing
   , fromZip
   , focusAt
@@ -73,6 +77,14 @@ class ZipTree t where
 
   -- | Ascend from a child to its parent using a frame.
   ascend :: Frame t -> t -> t
+
+  -- | Selector that produced a frame — the selector-level inverse of
+  --   'descend'. For every successful descent,
+  --   @descend c t == Just (_, fr)@ implies @childOf t fr == c@.
+  --   The tree argument only fixes the instance: @Frame t@ is a
+  --   non-injective type family, so a frame alone does not determine @t@.
+  --   Total: every frame records the step that reached its subtree.
+  childOf :: t -> Frame t -> Child t
 
 -- ---------------------------------------------------------------------------
 -- Zipper data type
@@ -124,6 +136,45 @@ safeNavigate path t = go path (rootZip t)
   where
     go []     z = Just z
     go (c:cs) z = down c z >>= go cs
+
+-- ---------------------------------------------------------------------------
+-- Navigation algebra
+-- ---------------------------------------------------------------------------
+
+-- | Selector path of a zipper's context stack: the root-first list of
+--   selectors that produced the nearest-first frame stack. For a stack
+--   @[fr_n, ..., fr_1]@ (nearest first), @pathOf = map (childOf node) .
+--   reverse@ where @node@ is the zipper's focus.
+--
+--   @
+--   safeNavigate p t == Just z  ==>  pathOf z == p
+--   @
+pathOf :: ZipTree t => Zip t -> [Child t]
+pathOf (Zip node fs) = map (childOf node) (reverse fs)
+
+-- | Context stack reached by a path in a supplied tree: @framesAt p t@ is
+--   the nearest-first frame stack along @p@, or 'Nothing' when @p@ is absent
+--   from @t@.
+--
+--   Navigation splits over path concatenation: navigating @p ++ q@ equals
+--   navigating @p@ and then @q@ from the resulting focus, and the context
+--   stacks concatenate nearer-first —
+--
+--   @
+--   safeNavigate p t == Just z  ==>
+--     framesAt (p ++ q) t == (++) <$> framesAt q (current z) <*> framesAt p t
+--   @
+framesAt :: ZipTree t => [Child t] -> t -> Maybe [Frame t]
+framesAt p t = context <$> safeNavigate p t
+
+-- | Longest common prefix of two selector paths — the deepest shared
+--   navigation prefix.
+--
+--   @lcaPath xs ys@ is the longest @zs@ with @xs = zs ++ xs'@ and
+--   @ys = zs ++ ys'@ for some suffixes @xs'@, @ys'@.
+lcaPath :: Eq c => [c] -> [c] -> [c]
+lcaPath (x:xs) (y:ys) | x == y = x : lcaPath xs ys
+lcaPath _      _               = []
 
 -- ---------------------------------------------------------------------------
 -- Bridge to Focusing
@@ -228,6 +279,9 @@ instance ZipTree (BinTree a) where
   ascend (LFrame r) l = Node l r
   ascend (RFrame l) r = Node l r
 
+  childOf _ (LFrame _) = GoLeft
+  childOf _ (RFrame _) = GoRight
+
 -- ---------------------------------------------------------------------------
 -- Rose tree (n-ary tree)
 -- ---------------------------------------------------------------------------
@@ -258,3 +312,5 @@ instance ZipTree (Rose a) where
 
   ascend (RoseFrame x before after) child =
     Rose x (before ++ [child] ++ after)
+
+  childOf _ (RoseFrame _ before _) = length before

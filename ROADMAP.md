@@ -116,7 +116,7 @@ Depends on: 0e, 7b. Done = ① boundary stated in §5 (function equality is not 
 Depends on: 1. Done = ① mechanism decision recorded ② derivation implemented ③ ≥ 1 existing family migrated with GP/PG/PP witnesses green ④ rung/registration in `docs/foundation.md`.
 
 37. Navigation algebra: path↔frame-stack conversion, path composition, lowest common ancestor, invalid-path semantics — formalizes the `XC` boundary (README note) where child selection must be decidable.
-Depends on: 0d. Done = ① operations exported on `Focal.Zipper` ② round-trip, composition, and LCA laws with witnesses ③ conformance rows; `XC` narrowed or discharged.
+Depends on: 0d. Done = ① operations exported on `Focal.Zipper` ② round-trip, composition, and LCA laws with witnesses ③ conformance rows; `XC` narrowed or discharged. [x]
 
 38. Zero-or-one focus (optional cardinality): an interface whose split may find no focus, with miss pass-through semantics (update on a miss is identity) — distinct from the failure channel; state its laws.
 Depends on: 0a, 4. Done = ① interface + laws in §3 ② witnesses ③ rank and boundary registered (Prism/Affine reading).

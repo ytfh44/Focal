@@ -37,30 +37,36 @@ and this project adheres to the
 - Added `Focal.Effectful` (`FocusingM`, `idM`, `composeM`, `overM`,
   `toEffectful`, `toEffectfulE`, `storeM`, `fromStoreM`): both legs in a monad
   (failure, validation, logging, state); GP/PG as Kleisli equations, preserved
-  by composition for every monad; PP per instance. Test suite: 119
+  by composition for every monad; PP per instance. Test suite: 126
   law-id-tagged properties.
 
 - Tightened the effectful PP statement to the replay-prefix equation (the
   first write is shared, so failures short-circuit together and no success
   premise is needed); discriminators extended (logging and sign-flipping
   residuals fail it; the prefix-less strengthening stays pinned as false).
-  Law tables now count the effectful witnesses: 119 properties; the module
+  Law tables now count the effectful witnesses: 126 properties; the module
   haddock and README phrasing use the replay-prefix wording.
 
 - Added residual-shape helpers (`Residual2`, `Residual3`, `flatten`, `unflatten`,
   `prettyResidual`, `prettyResidual3`) to `Focal.Core`: canonical right-nested
   residual pairs, mutually-inverse reassociation, and debug renderings. Suite at
-  119 properties.
+  126 properties.
 
 - Stated the type-changing clause forms in `docs/foundation.md` §3 (per-clause
   side conditions; no round-trip is statable when `t ≁ s`) with witnesses for
   product components at changed types and a two-stage composed chain
-  (`prop_tc_*`). Suite at 119 properties.
+  (`prop_tc_*`). Suite at 126 properties.
 
 - Added `focusAtE` (`PathError`, `Focal.Zipper`): the failure-channel dynamic
   path focus — construction is total, `splitE` re-navigates per call and
   reports the first missing step as `Left (PathError i)`, `plugE` is total.
-  Suite at 119 properties.
+  Suite at 126 properties.
+
+- Added the navigation algebra to `Focal.Zipper`: `childOf` (frames record
+  their selector), `pathOf` (context stack to root-first path), `framesAt`
+  (path to context stack), `lcaPath` (longest common path prefix) — with
+  round-trip, composition, LCA prefix/maximality, and `childOf`/`descend`-inverse
+  witnesses. Suite at 126 properties.
 
 ## 0.1.0.0 - YYYY-MM-DD
 

@@ -5,7 +5,7 @@ module Main (main) where
 
 import Control.Exception (ErrorCall, evaluate, try)
 import Control.Monad.State (State, get, put, runState)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe (isNothing)
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -201,6 +201,15 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "path absent in a later tree: Left (PathError i)" prop_focusatE_laterMissing
       , testProperty "GP on the success domain" prop_focusatE_gp
       , testProperty "plugE ctx b = Right (rebuild b ctx)" prop_focusatE_plug
+      ]
+  , testGroup "Navigation algebra (ROADMAP 37)"
+      [ testProperty "Rose: pathOf (safeNavigate p t) = p" prop_nav_pathOf_rose
+      , testProperty "BinTree: pathOf (safeNavigate p t) = p" prop_nav_pathOf_bintree
+      , testProperty "Rose: framesAt (p ++ q) concatenates q-then-p stacks" prop_nav_compose_rose
+      , testProperty "lcaPath is a prefix of both paths" prop_nav_lca_prefix
+      , testProperty "lcaPath is maximal (no longer common prefix)" prop_nav_lca_maximal
+      , testProperty "Rose: childOf recovers the descent selector" prop_nav_childOf_rose
+      , testProperty "BinTree: childOf recovers the descent selector" prop_nav_childOf_bintree
       ]
   ]
 
@@ -1269,6 +1278,68 @@ prop_focusatE_plug t b =
         in plugE f (context z) b === Right (rebuild b (context z))
 
 --------------------------------------------------------------------
+-- Navigation algebra (ROADMAP 37)
+--------------------------------------------------------------------
+
+-- | A path generated in a tree round-trips through navigation: the context
+--   stack reached by @p@ records exactly the selectors of @p@, root-first.
+prop_nav_pathOf_rose :: Rose Int -> Property
+prop_nav_pathOf_rose t =
+  forAll (genPathIn t) $ \p ->
+    case safeNavigate p t of
+      Nothing -> property False
+      Just z  -> pathOf z === p
+
+prop_nav_pathOf_bintree :: BinTree Int -> Property
+prop_nav_pathOf_bintree t =
+  forAll (genBinPathIn t) $ \p ->
+    case safeNavigate p t of
+      Nothing -> property False
+      Just z  -> pathOf z === p
+
+-- | Navigation splits over path concatenation: the context stack of @p ++ q@
+--   concatenates the nearer-first stacks of @q@ (taken from the focus of @p@)
+--   and of @p@ — the law documented on 'framesAt'.
+prop_nav_compose_rose :: Rose Int -> Property
+prop_nav_compose_rose t =
+  forAll (genPathIn t) $ \p ->
+    case safeNavigate p t of
+      Nothing -> property False
+      Just z  ->
+        forAll (genPathIn (current z)) $ \q ->
+          framesAt (p ++ q) t === ((++) <$> framesAt q (current z) <*> framesAt p t)
+
+prop_nav_lca_prefix :: [Int] -> [Int] -> Bool
+prop_nav_lca_prefix p q =
+  let l = lcaPath p q
+  in l `isPrefixOf` p && l `isPrefixOf` q
+
+prop_nav_lca_maximal :: [Int] -> [Int] -> Bool
+prop_nav_lca_maximal p q =
+  let l = lcaPath p q
+  in all (\k -> take k p /= take k q)
+         [length l + 1 .. min (length p) (length q)]
+
+-- | A frame records the selector that reached it: for a successful descent,
+--   @childOf@ returns the selector used.
+prop_nav_childOf_rose :: Rose Int -> Property
+prop_nav_childOf_rose t@(Rose _ kids) =
+  not (null kids) ==>
+    forAll (chooseInt (0, length kids - 1)) $ \idx ->
+      case descend idx t of
+        Nothing      -> property False
+        Just (_, fr) -> childOf t fr === idx
+
+prop_nav_childOf_bintree :: BinTree Int -> Property
+prop_nav_childOf_bintree Leaf{} = property True
+prop_nav_childOf_bintree t@(Node _ _) =
+  conjoin [check GoLeft, check GoRight]
+  where
+    check c = case descend c t of
+      Nothing      -> property False
+      Just (_, fr) -> childOf t fr === c
+
+--------------------------------------------------------------------
 -- QuickCheck generators
 --------------------------------------------------------------------
 
@@ -1324,6 +1395,16 @@ genPathIn (Rose _ kids)
       k <- chooseInt (0, length kids - 1)
       rest <- genPathIn (kids !! k)
       pure (k : rest)
+
+-- | Generate a path of child selections that exists in the supplied binary
+--   tree (a leaf yields the empty path, valid at the root).
+genBinPathIn :: BinTree Int -> Gen [BinChild]
+genBinPathIn (Leaf _) = pure []
+genBinPathIn (Node l r) = do
+  k <- chooseInt (0, 1)
+  if k == 0
+    then (GoLeft :) <$> genBinPathIn l
+    else (GoRight :) <$> genBinPathIn r
 
 -- | Generate a path that cannot be taken in the supplied Rose tree: some
 --   (possibly empty) valid prefix, then one child selection that is out of
