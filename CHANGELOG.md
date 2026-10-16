@@ -1,4 +1,4 @@
-# Changelog for `Focal`
+# Changelog for `focal-core`
 
 All notable changes to this project will be documented in this file.
 

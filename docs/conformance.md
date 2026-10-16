@@ -1,8 +1,8 @@
 # Focal — Conformance Matrix
 
 Per-instance verdicts against the law vocabulary in
-[`foundation.md`](foundation.md) §3, for the `0.1.0.0` working tree
-(2026-10-15). Witnesses refer to [`../test/Spec.hs`](../test/Spec.hs).
+[`foundation.md`](foundation.md) §3, for the `focal-core-0.1.0.0` working tree
+(2026-10-16). Witnesses refer to [`../test/Spec.hs`](../test/Spec.hs).
 
 Legend: **✓** holds on the declared domain · **✗** fails · **cnd** conditional
 on the obligation the instance embeds · **def** holds by definition

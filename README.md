@@ -23,7 +23,7 @@ The library currently ships with a proof-of-concept set: Lens-like focusing, pos
 
 | Field | Value |
 |---|---|
-| **Package** | `Focal` |
+| **Package** | `focal-core` |
 | **Version** | `0.1.0.0` |
 | **License** | BSD-3-Clause |
 | **Compiler** | GHC ≥ 9.2, Haskell Stack |
