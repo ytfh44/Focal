@@ -84,5 +84,5 @@ and this project adheres to the
   update — distinct from the failure channel; hit-domain GP/PG/PP plus miss,
   short-circuit, and composition witnesses. Suite at 136 properties.
 
-## 0.1.0.0 - YYYY-MM-DD
+## 0.1.0.0 - 2026-10-16
 

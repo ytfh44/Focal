@@ -95,7 +95,7 @@ Depends on: 1, 4. Done = ① helpers exported ② flatten/unflatten round-trip t
 Depends on: 0e. Done = ① implemented with L-NORM tests ② conformance row green. [x]
 
 8. Publish `focal-core-0.1`: freeze the core API, laws, partial/effectful extension points, and existing strong specializations.
-Depends on: 0a–0e, 0g, 1–7b (0f is trigger-based — it does not gate the release). Done = ① foundation compliance: every claim in README/haddock maps to L0–L6 with a witness or a registered gap ② conformance matrix fully green or registering explicit exemptions ③ doctest gate active (0g) ④ multi-package mechanism decided (M-4).
+Depends on: 0a–0e, 0g, 1–7b (0f is trigger-based — it does not gate the release). Done = ① foundation compliance: every claim in README/haddock maps to L0–L6 with a witness or a registered gap ② conformance matrix fully green or registering explicit exemptions ③ doctest gate active (0g) ④ multi-package mechanism decided (M-4). [x]
 
 ---
 
@@ -229,7 +229,8 @@ M-3. Dissection left/right heterogeneous upgrade (type-changing residuals for `L
 Depends on: —. Trigger: a type-changing (heterogeneous) residual use case appears. Done = ① formulation + worked example ② law statement for the asymmetric case.
 
 M-4. `Focal` → `focal-core` multi-package mechanism.
-Depends on: —. Trigger: the item-8 release line (the mechanism is needed before publishing). Done = ① mechanism decided (packages, versioning) ② items 1 and 0e updated accordingly.
+Depends on: —. Trigger: the item-8 release line (the mechanism is needed before publishing). Done = ① mechanism decided (packages, versioning) ② items 1 and 0e updated accordingly. [x]
+Decision recorded 2026-10-16: single package `focal-core` (modules stay `Focal.*`, repository remains `Focal`); versioning: minor bump per release in the 0.x series; per-package split (`focal-syntax` et al.) only when a second package is scheduled (P3). The Hackage upload is a manual owner step outside item 8's Done.
 
 M-5. Heterogeneous error composition: allow `composeE` across distinct error types with origin-preserving injections (`e1 + e2`), or record the single-`e` policy as final.
 Depends on: —. Trigger: a composition spanning two distinct error types appears. Done = ① decision (injection API vs single-`e` policy) ② if adopted: origin-preservation witnesses + conformance row.
