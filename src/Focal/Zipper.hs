@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -47,6 +48,8 @@ module Focal.Zipper
   , Rose(..)
   , RoseFrame(..)
   ) where
+
+import GHC.Generics (Generic1)
 
 import Focal.Core (Focusing(..))
 import Focal.Partial (FocusingE(..))
@@ -290,7 +293,7 @@ instance ZipTree (BinTree a) where
 --
 --   This is the most common AST representation.
 data Rose a = Rose a [Rose a]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic1)
 
 -- | Rose tree context frame: the parent label, siblings before the focus,
 --   and siblings after the focus.

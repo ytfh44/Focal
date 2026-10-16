@@ -139,6 +139,10 @@ Both legs live in a monad `m`: failures (`m = Either e`), validation, logging
 (`toEffectful`). GP/PG hold as Kleisli equations and are preserved by
 `composeM` for every monad; PP holds per instance in the replay-prefix form.
 
+### 7. Generic one-hole contexts (`Focal.Generic`)
+
+One-hole contexts of the leftmost *direct* occurrence of the type parameter, derived from `Generic1` representations (`Derivative1`/`Ctx1`, `genericSplit1`/`genericPlug1`, `genericFocus`); the shipped `Rose` tree is migrated at its root label. Direct occurrences only — a parameter reachable only under another functor or recursion has no generic hole.
+
 ---
 
 ## Law status
@@ -169,13 +173,13 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 | **L5** | Contracts (domains, failure modes, input invariance) | Documentation + conformance matrix | [docs/conformance.md](docs/conformance.md) |
 | **L6** | Engineering constraints (scope and process) | Review / CI | [ROADMAP.md](ROADMAP.md) §0 |
 
-**Test families.** The suite is law-id tagged — `L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`, `L-UNIT`, `L-NORM`, `L-TVL` — plus their partial success-premise variants (`prop_*E_*`), contract groups (`focusAt`, `focusAtE`, `elementAt`, `elementE`, snapshot contracts, discriminators), the failure-channel wiring group (`FocusingE`), the effectful groups (`FocusingM`: laws, composition/embedding/store, discriminators), the navigation algebra (`prop_nav_*`), and regression groups; per-instance witnesses are listed in the conformance matrix.
+**Test families.** The suite is law-id tagged — `L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`, `L-UNIT`, `L-NORM`, `L-TVL` — plus their partial success-premise variants (`prop_*E_*`), contract groups (`focusAt`, `focusAtE`, `elementAt`, `elementE`, snapshot contracts, discriminators), the failure-channel wiring group (`FocusingE`), the effectful groups (`FocusingM`: laws, composition/embedding/store, discriminators), the navigation algebra (`prop_nav_*`), the generic-derivation group (`prop_gen_*`), and regression groups; per-instance witnesses are listed in the conformance matrix.
 
 **Boundary notes.** `XA` (type endpoints): deferred — requires indexed GADTs. `XC` (navigation normalization): discharged — frames record their selector (`childOf`), so path↔frame conversion decides the selector directly; no child enumeration. `XE` (sharing boundary): occurrence focus ≠ vertex focus for DAGs — documented boundary. `XF` (strategy externalization): no strategy in `plugF`, by design. `XG` (computability witness): `ZipTree` child selection defaults to `Int`; not yet exposed.
 
 ### Coverage
 
-The test suite has **126 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
+The test suite has **130 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 

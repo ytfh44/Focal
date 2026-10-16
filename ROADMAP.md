@@ -113,7 +113,7 @@ Depends on: 0d, 4. Done = ① `focusAtE` exported (rank ≤ 1), per-call path va
 Depends on: 0e, 7b. Done = ① boundary stated in §5 (function equality is not decidable; no total residual minimization) ② admissible-discard rules for `normalize`/re-representation ③ checkable rules get witnesses; the rest registered as gaps. [x]
 
 36. Generic one-hole contexts: derive residuals/frames for algebraic datatypes instead of hand-writing one family at a time (generics or codegen — decide and record).
-Depends on: 1. Done = ① mechanism decision recorded ② derivation implemented ③ ≥ 1 existing family migrated with GP/PG/PP witnesses green ④ rung/registration in `docs/foundation.md`.
+Depends on: 1. Done = ① mechanism decision recorded ② derivation implemented ③ ≥ 1 existing family migrated with GP/PG/PP witnesses green ④ rung/registration in `docs/foundation.md`. [x]
 
 37. Navigation algebra: path↔frame-stack conversion, path composition, lowest common ancestor, invalid-path semantics — formalizes the `XC` boundary (README note) where child selection must be decidable.
 Depends on: 0d. Done = ① operations exported on `Focal.Zipper` ② round-trip, composition, and LCA laws with witnesses ③ conformance rows; `XC` narrowed or discharged. [x]

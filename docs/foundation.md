@@ -22,6 +22,12 @@ this document and the code disagree, the code wins and this document is fixed.
 - **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
   validation, logging, and state live in the monad `m`; `FocusingE` is the
   `m = Either e` case, and a pure `Focusing` embeds by purity.
+- **Generic derivation** — 'Derivative1' / 'genericFocus' (`Focal.Generic`):
+  one-hole contexts of the leftmost *direct* type-parameter occurrence,
+  derived from `Generic1` representations (metadata wrappers delegate; sums
+  delegate; products are left-biased; constants, `U1`, `V1`, and recursive
+  children have no direct occurrence). Holes under recursive children remain
+  the zipper's frame-stack territory.
 
 | Level | Name | What it is | Enforced by | Violation consequence |
 |---|---|---|---|---|
@@ -139,14 +145,14 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 126: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 126: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 126: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 126: `prop_lovf_*` (four instances plus the partial success-prefix case) |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 126: `prop_lassoc_*` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 126: `prop_lunit_*` |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 126: `prop_lnorm_*` |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 126: `prop_ltvl_*` |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 130: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 130: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 130: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 130: `prop_lovf_*` (four instances plus the partial success-prefix case) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 130: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 130: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 130: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 130: `prop_ltvl_*` |
 | definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
@@ -207,6 +213,7 @@ Every throw site is registered below and in `conformance.md`:
 | `unsafeElementF`, construction | `n < 0` | immediate `error` |
 | `unsafeElementF`'s `splitF` | `n >= length xs` | delayed `error` |
 | `focusAt`'s `splitF` | path absent in the supplied tree (the construction tree is checked separately, returning `Nothing`) | delayed `error` |
+| `genericFocus`'s `splitF` | a value whose parameter has no reachable direct occurrence | delayed `error` ("genericFocus: no reachable direct parameter occurrence") |
 
 The registered `error` sites are kept unchanged; for new code the channel variant is the interface (`Focal.Partial`, `Focal.Effectful`; `Focal.List.elementE` for the list focus); the `focusAt` counterpart `focusAtE` is total at construction and reports the first missing path step in the return channel (`Left (PathError i)`) — no deferred `error`.
 

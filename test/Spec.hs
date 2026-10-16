@@ -7,6 +7,7 @@ import Control.Exception (ErrorCall, evaluate, try)
 import Control.Monad.State (State, get, put, runState)
 import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe (isNothing)
+import GHC.Generics (Rep1)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
@@ -17,6 +18,7 @@ import Focal.Zipper
 import Focal.Interop
 import Focal.Partial
 import Focal.Effectful
+import Focal.Generic (Derivative1(..), genericFocus, genericPlug1, genericSplit1)
 
 main :: IO ()
 main = defaultMain tests
@@ -210,6 +212,12 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "lcaPath is maximal (no longer common prefix)" prop_nav_lca_maximal
       , testProperty "Rose: childOf recovers the descent selector" prop_nav_childOf_rose
       , testProperty "BinTree: childOf recovers the descent selector" prop_nav_childOf_bintree
+      ]
+  , testGroup "Generic derivation (ROADMAP 36)"
+      [ testProperty "Rose: genericSplit1/genericPlug1 roundtrip" prop_gen_split_plug
+      , testProperty "roseGeneric: GP (overF id = id)" prop_gen_rose_gp
+      , testProperty "roseGeneric: PG (re-split recovers b)" prop_gen_rose_pg
+      , testProperty "roseGeneric: PP (plug c' b2 = plug c b2)" prop_gen_rose_pp
       ]
   ]
 
@@ -1338,6 +1346,39 @@ prop_nav_childOf_bintree t@(Node _ _) =
     check c = case descend c t of
       Nothing      -> property False
       Just (_, fr) -> childOf t fr === c
+
+--------------------------------------------------------------------
+-- Generic derivation — one-hole contexts (ROADMAP 36)
+--------------------------------------------------------------------
+
+-- | Generic focus at the leftmost direct parameter occurrence: for a rose
+--   tree that is the root label (the children sit under the list functor and
+--   recursion, so they have no direct occurrence).
+roseGeneric :: Focusing (Ctx1 (Rep1 Rose) Int) (Rose Int) (Rose Int) Int Int
+roseGeneric = genericFocus
+
+-- | The decomposition always succeeds for @Rose@ (the root label is a direct
+--   occurrence); @Nothing@ is a real failure.
+prop_gen_split_plug :: Rose Int -> Bool
+prop_gen_split_plug t =
+  case genericSplit1 t of
+    Just (a, c) -> genericPlug1 c a == t
+    Nothing     -> False
+
+prop_gen_rose_gp :: Rose Int -> Bool
+prop_gen_rose_gp t = overF roseGeneric id t == t
+
+prop_gen_rose_pg :: Rose Int -> Bool
+prop_gen_rose_pg t =
+  let (a, c)  = splitF roseGeneric t
+      (a', _) = splitF roseGeneric (plugF roseGeneric c a)
+  in a' == a
+
+prop_gen_rose_pp :: Rose Int -> Int -> Int -> Bool
+prop_gen_rose_pp t b1 b2 =
+  let (_, c)  = splitF roseGeneric t
+      (_, c') = splitF roseGeneric (plugF roseGeneric c b1)
+  in plugF roseGeneric c' b2 == plugF roseGeneric c b2
 
 --------------------------------------------------------------------
 -- QuickCheck generators

@@ -45,6 +45,7 @@ library:
   - Focal.Interop
   - Focal.Partial
   - Focal.Effectful
+  - Focal.Generic
 
 executables:
   Focal-exe:

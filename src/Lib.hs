@@ -14,6 +14,7 @@
 --   * "Focal.Interop" — 'VLens', 'PStore', 'toVL', 'fromVL', 'normalize'
 --   * "Focal.Partial" — 'FocusingE', 'composeE', 'overE', 'toStoreE'
 --   * "Focal.Effectful" — 'FocusingM', 'composeM', 'overM', 'storeM'
+--   * "Focal.Generic" — 'Derivative1', 'genericSplit1', 'genericFocus'
 module Lib
   ( module Focal.Core
   , module Focal.Tuple
@@ -22,6 +23,7 @@ module Lib
   , module Focal.Interop
   , module Focal.Partial
   , module Focal.Effectful
+  , module Focal.Generic
   ) where
 
 import Focal.Core
@@ -31,3 +33,4 @@ import Focal.Zipper
 import Focal.Interop
 import Focal.Partial
 import Focal.Effectful
+import Focal.Generic

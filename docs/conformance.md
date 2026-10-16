@@ -25,6 +25,7 @@ not an instance (projection).
 | `Focal.Interop` (`toVL`/`fromVL`/`normalize`) | — | — | — | — | — | rank-2 CPS via `mkFocal`/`withFocal`; extensional only (foundation §5) | `prop_lnorm_*`, `prop_ltvl_*` | conversions are extensional; residual not recoverable |
 | `Focal.Partial` (`FocusingE`, `composeE`, `overE`, `toStoreE`) | — | — | — | — | — | failures in return values; laws carry success premises (foundation §3) | `prop_lgpE_*`, `prop_lpgE_*`, `prop_lppE_*`, `prop_lovfE_*`, `prop_scE_*`, `prop_embE_compose`, `prop_storeE_roundtrip` | rank ≤ 1; `toStoreE` extensional; `prop_discE_*` pins the premise necessity |
 | `Focal.Effectful` (`FocusingM`, `composeM`, `overM`, `storeM`) | — | — | — | — | — | GP/PG as Kleisli equations (PG in continuation form); PP as the replay-prefix equation, per instance (foundation §3) | `prop_lgpM_*`, `prop_lpgM_*`, `prop_lppM_*`, `prop_compM_*`, `prop_lunitM_*`, `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*` | GP/PG composition closure holds for every monad; `prop_discM_*` pins the forced premises |
+| `Focal.Generic` (`Derivative1`, `Ctx1`, `genericSplit1`, `genericPlug1`, `genericFocus`) | — | — | — | — | — | direct occurrences only (leftmost); a value whose parameter has no reachable direct occurrence is outside the declared domain — `genericSplit1` returns `Nothing`, `splitF` raises the registered delayed `error` (foundation §4.1) | `prop_gen_split_plug`, `prop_gen_rose_gp`, `prop_gen_rose_pg`, `prop_gen_rose_pp` | one-hole contexts derived from `Generic1`; `Rose` migrated (root label) |
 
 Verdict footnotes:
 
@@ -41,26 +42,27 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree (**126 properties**,
+Reviewed property-by-property against the working tree (**130 properties**,
 plus the doctest suite):
 
-- **L-GP: 15 of 126** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
-- **L-PG: 13 of 126** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
-- **L-PP: 9 of 126** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
+- **L-GP: 15 of 130** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
+- **L-PG: 13 of 130** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
+- **L-PP: 9 of 130** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
   one trivially-satisfied snapshot case, `prop_lpp_fromZip`).
-- **L-OVF: 5 of 126** (`prop_lovf_*` — four instances plus the partial
+- **L-OVF: 5 of 130** (`prop_lovf_*` — four instances plus the partial
   success-prefix case).
-- **L-ASSOC: 3 of 126** (`prop_lassoc_*`); **L-UNIT: 6 of 126** (`prop_lunit_*`).
-- **L-NORM: 2 of 126** (`prop_lnorm_*`); **L-TVL: 2 of 126** (`prop_ltvl_*`).
-- **Partial channel: 6 of 126** (`prop_scE_*`, `prop_embE_compose`,
+- **L-ASSOC: 3 of 130** (`prop_lassoc_*`); **L-UNIT: 6 of 130** (`prop_lunit_*`).
+- **L-NORM: 2 of 130** (`prop_lnorm_*`); **L-TVL: 2 of 130** (`prop_ltvl_*`).
+- **Partial channel: 6 of 130** (`prop_scE_*`, `prop_embE_compose`,
   `prop_storeE_roundtrip`, `prop_discE_*`).
-- **`elementE` contract: 7 of 126** (`prop_elementE_*`).
-- **Effectful rung (non-law): 12 of 126** (`prop_compM_*`, `prop_lunitM_*`,
+- **`elementE` contract: 7 of 130** (`prop_elementE_*`).
+- **Effectful rung (non-law): 12 of 130** (`prop_compM_*`, `prop_lunitM_*`,
   `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*`).
-- **Residual shape: 2 of 126** (`prop_flatten_inverse`, `prop_unflatten_inverse`).
-- **Type-changing fragment: 5 of 126** (`prop_tc_*`).
-- **`focusAtE` contract: 5 of 126** (`prop_focusatE_*`).
-- **Navigation algebra: 7 of 126** (`prop_nav_*`).
+- **Residual shape: 2 of 130** (`prop_flatten_inverse`, `prop_unflatten_inverse`).
+- **Type-changing fragment: 5 of 130** (`prop_tc_*`).
+- **`focusAtE` contract: 5 of 130** (`prop_focusatE_*`).
+- **Navigation algebra: 7 of 130** (`prop_nav_*`).
+- **Generic derivation: 4 of 130** (`prop_gen_*`).
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,
