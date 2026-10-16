@@ -68,5 +68,11 @@ and this project adheres to the
   round-trip, composition, LCA prefix/maximality, and `childOf`/`descend`-inverse
   witnesses. Suite at 126 properties.
 
+- Stated the residual representation-equivalence rules in `docs/foundation.md`
+  §5: putback-equivalence as the law-layer residual identity, the
+  geometry-vs-putback-function distinction, the admissible-discard rules for
+  re-representation, and the registered boundary that no total residual
+  minimization exists (function equality is undecidable).
+
 ## 0.1.0.0 - YYYY-MM-DD
 

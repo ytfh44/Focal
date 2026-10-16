@@ -275,6 +275,26 @@ Caveats:
   McBride, *Clowns to the Left of Me, Jokers to the Right*, POPL '08;
   Huet, *Functional Pearl: The Zipper*, JFP 1997.
 
+**Residual representation-equivalence rules.** Two residuals of the same
+instance are *putback-equivalent* when they rebuild identically:
+
+@
+c1 ~ c2  ⇔  ∀ b. plugF f c1 b == plugF f c2 b
+@
+
+Putback-equivalence is the only residual identity available to the law layer —
+residuals are functions into the target, and function equality is not decidable
+in Haskell, so no residual *value* comparison is sound. Two residuals may be
+putback-equivalent while carrying different geometry (position, provenance,
+debug information): *residual as geometry* and *residual as putback function*
+are distinct, and the second is the quotient by `~`. Re-representations
+(`normalize`, `toStoreLike`, the Van Laarhoven conversions) may discard residual
+structure exactly up to `~`; their accounting is extensional (`L-NORM`,
+`L-TVL`), and any law that needs residual identity rather than putback behavior
+must be stated on `Focusing`. Boundary (registered gap): there is no total
+residual minimization — `normalize` canonicalizes extensional behavior, it does
+not minimize, and the undecidability of function equality is why.
+
 ## 6. Defect log
 
 "Before" paraphrases the old wording instead of quoting it, so that the retired
