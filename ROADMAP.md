@@ -104,7 +104,7 @@ Depends on: 0a–0e, 0g, 1–7b (0f is trigger-based — it does not gate the re
 The core's own mathematics: the laws and interfaces the shipped rungs leave open, plus the structure algebra. These items extend the core beyond the 0.1 freeze — they do not gate item 8. Closure work already homed elsewhere is cross-referenced at the end of this section.
 
 33. Type-changing law suite: state the A-LENS clause forms for `s ≠ t` / `a ≠ b` with their side conditions, closing the gap between the five-parameter interface and the mono §3 statements.
-Depends on: 0a, 0b. Done = ① clause forms written in `docs/foundation.md` §3 with side conditions ② ≥ 2 type-changing instances with witnesses (product components; a composed chain) ③ conformance rows updated.
+Depends on: 0a, 0b. Done = ① clause forms written in `docs/foundation.md` §3 with side conditions ② ≥ 2 type-changing instances with witnesses (product components; a composed chain) ③ conformance rows updated. [x]
 
 34. Dynamic failure channel — `focusAtE`: path focus whose invalidity at split time travels in the return channel (no deferred `error` for the caller).
 Depends on: 0d, 4. Done = ① `focusAtE` exported (rank ≤ 1), per-call path validation ② tests: valid domain, off-tree path, path absent in a later tree ③ conformance row + §4.1 exemption narrowed.

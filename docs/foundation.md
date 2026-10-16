@@ -139,14 +139,14 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 109: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 109: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 109: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 109: `prop_lovf_*` (four instances plus the partial success-prefix case) |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 109: `prop_lassoc_*` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 109: `prop_lunit_*` |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 109: `prop_lnorm_*` |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 109: `prop_ltvl_*` |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 114: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 114: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 114: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 114: `prop_lovf_*` (four instances plus the partial success-prefix case) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 114: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 114: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 114: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 114: `prop_ltvl_*` |
 | definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the
@@ -185,6 +185,8 @@ partial plugs (`prop_discM_ppPartial`).
 **Composition closure:** GP and PG are preserved under 'composeM' for every
 monad — bind associativity plus the component laws, no commutativity needed —
 witnessed by `prop_compM_*` and an exhaustive small-universe sweep.
+
+**Type-changing fragment.** The clauses above hold at *coherent* instantiations — exactly those where the equation is well-typed; the side conditions are: GP needs `t ~ s` and `b ~ a` (the round-trip returns the source type, and the replacement is the extracted focus); PG needs `t ~ s` (the re-split consumes a source) and `b ~ a`; PP needs `t ~ s` only (the re-split of a plug output requires the source type; `b1` and `b2` stay at the focus type). Where `t ≁ s` the interface remains usable — `splitF` decomposes any source, `plugF` rebuilds any target — but no round-trip is *statable*: no operation re-splits a target. The accountable content of that fragment is per-instance: the decomposition equation (each instance's `splitF f s` definition) and the rebuild equation (`plugF f c b` definition), plus composition typing — `composeF` residuals carry the polymorphism through. Witnesses: `prop_tc_fstF_*` and `prop_tc_sndF_*` (product components at `s ≠ t`, `a ≠ b`) and `prop_tc_composed` (a two-stage chain changing both).
 
 ## 4. Contracts
 

@@ -188,6 +188,13 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       [ testProperty "unflatten (flatten ((a,b),c)) = ((a,b),c)" prop_flatten_inverse
       , testProperty "flatten (unflatten (a,(b,c))) = (a,(b,c))" prop_unflatten_inverse
       ]
+  , testGroup "Type-changing fragment (ROADMAP 33)"
+      [ testProperty "fstF: split form at s ≠ t, a ≠ b" prop_tc_fstF_split
+      , testProperty "fstF: plug form" prop_tc_fstF_plug
+      , testProperty "sndF: split form" prop_tc_sndF_split
+      , testProperty "sndF: plug form" prop_tc_sndF_plug
+      , testProperty "composed chain: overF show" prop_tc_composed
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -1163,6 +1170,37 @@ prop_flatten_inverse a b c =
 prop_unflatten_inverse :: Int -> Bool -> Char -> Bool
 prop_unflatten_inverse a b c =
   flatten (unflatten ((a, (b, c)) :: Residual3 Int Bool Char)) == (a, (b, c))
+
+--------------------------------------------------------------------
+-- Type-changing fragment (ROADMAP 33)
+--------------------------------------------------------------------
+
+prop_tc_fstF_split :: Int -> Bool -> Bool
+prop_tc_fstF_split n c =
+  splitF (fstF :: Focusing Bool (Int, Bool) (String, Bool) Int String) (n, c) == (n, c)
+
+prop_tc_fstF_plug :: Bool -> String -> Bool
+prop_tc_fstF_plug c s =
+  plugF (fstF :: Focusing Bool (Int, Bool) (String, Bool) Int String) c s == (s, c)
+
+prop_tc_sndF_split :: Int -> Bool -> Bool
+prop_tc_sndF_split n c =
+  splitF (sndF :: Focusing Int (Int, Bool) (Int, String) Bool String) (n, c) == (c, n)
+
+prop_tc_sndF_plug :: Int -> String -> Bool
+prop_tc_sndF_plug n s =
+  plugF (sndF :: Focusing Int (Int, Bool) (Int, String) Bool String) n s == (n, s)
+
+-- | A two-stage chain that changes both the whole and the focus types: the
+--   second component of an outer pair, then the first component of the inner pair.
+tcComposed :: Focusing (Int, Bool) (Int, (Int, Bool)) (Int, (String, Bool)) Int String
+tcComposed = composeF
+  (sndF :: Focusing Int (Int, (Int, Bool)) (Int, (String, Bool)) (Int, Bool) (String, Bool))
+  (fstF :: Focusing Bool (Int, Bool) (String, Bool) Int String)
+
+prop_tc_composed :: Int -> Int -> Bool -> Bool
+prop_tc_composed n x c =
+  overF tcComposed show (n, (x, c)) == (n, (show x, c))
 
 --------------------------------------------------------------------
 -- QuickCheck generators
