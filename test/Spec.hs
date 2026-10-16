@@ -184,6 +184,10 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "replay-prefix PP is false for logging" prop_discM_ppReplayLog
       , testProperty "replay-prefix PP is false for sign-flipping residuals" prop_discM_ppReplayAbs
       ]
+  , testGroup "Residual shape — reassociation (ROADMAP 7a)"
+      [ testProperty "unflatten (flatten ((a,b),c)) = ((a,b),c)" prop_flatten_inverse
+      , testProperty "flatten (unflatten (a,(b,c))) = (a,(b,c))" prop_unflatten_inverse
+      ]
   ]
 
 --------------------------------------------------------------------
@@ -1147,6 +1151,18 @@ prop_discM_ppReplayAbs :: Bool
 prop_discM_ppReplayAbs =
   (do _ <- plugM absM (-2) 0; plugM absM (-2) 1)
     /= (do t <- plugM absM (-2) 0; (_, c') <- splitM absM t; plugM absM c' 1)
+
+--------------------------------------------------------------------
+-- Residual shape — reassociation (ROADMAP 7a)
+--------------------------------------------------------------------
+
+prop_flatten_inverse :: Int -> Bool -> Char -> Bool
+prop_flatten_inverse a b c =
+  unflatten (flatten ((a, b), c)) == ((a, b), c)
+
+prop_unflatten_inverse :: Int -> Bool -> Char -> Bool
+prop_unflatten_inverse a b c =
+  flatten (unflatten ((a, (b, c)) :: Residual3 Int Bool Char)) == (a, (b, c))
 
 --------------------------------------------------------------------
 -- QuickCheck generators

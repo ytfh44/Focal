@@ -89,7 +89,7 @@ Depends on: 4, 0c. Done = ① `FocusingE`-based list focus ② `elementAt` lande
 Depends on: 4. Done = ① `Focal.Effectful` exported: `FocusingM(..)`, `idM`, `composeM`, `overM`, `toEffectful`, `toEffectfulE`, `storeM`, `fromStoreM` (all rank ≤ 1) ② rung registered in `docs/foundation.md` §1 ③ law witnesses: the L-GP/L-PG monadic forms green for ≥ 3 instances across distinct monads (logging, partial, state) + composition closure (GP/PG preserved under `composeM`; algebraic proof + probe/exhaustive-sweep evidence) + `prop_discM_*` pins: bare PG fails with effects; the replay-prefix PP fails for logging and sign-flipping residuals, and the prefix-less strengthening is false ④ Store/coend reading: unconditional collapse `∫^C Hom(S, m(A×C)) × Hom(C, B→mT) ≅ Hom(S, m(A×(B→mT)))` documented in §5; rank re-checked. [x]
 
 7a. Normalize residual composition (syntax): `Residual2`, `Residual3`, flatten/unflatten, pretty/debug helpers to avoid long-term exposure of deeply nested pairs.
-Depends on: 1, 4. Done = ① helpers exported ② flatten/unflatten round-trip tests.
+Depends on: 1, 4. Done = ① helpers exported ② flatten/unflatten round-trip tests. [x]
 
 7b. `normalize` (extensional normal form for `Focal`). Tracked in 0e.
 Depends on: 0e. Done = ① implemented with L-NORM tests ② conformance row green. [x]

@@ -173,7 +173,7 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 
 ### Coverage
 
-The test suite has **107 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
+The test suite has **109 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 

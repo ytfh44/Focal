@@ -41,22 +41,23 @@ Verdict footnotes:
 
 ## Coverage honesty
 
-Reviewed property-by-property against the working tree (**107 properties**,
+Reviewed property-by-property against the working tree (**109 properties**,
 plus the doctest suite):
 
-- **L-GP: 15 of 107** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
-- **L-PG: 13 of 107** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
-- **L-PP: 9 of 107** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
+- **L-GP: 15 of 109** (`prop_lgp_*` 8, partial `prop_lgpE_*` 3, effectful `prop_lgpM_*` 4).
+- **L-PG: 13 of 109** (`prop_lpg_*` 7, partial `prop_lpgE_*` 2, effectful `prop_lpgM_*` 4).
+- **L-PP: 9 of 109** (`prop_lpp_*` 5, partial `prop_lppE_*` 2, effectful `prop_lppM_*` 2;
   one trivially-satisfied snapshot case, `prop_lpp_fromZip`).
-- **L-OVF: 5 of 107** (`prop_lovf_*` — four instances plus the partial
+- **L-OVF: 5 of 109** (`prop_lovf_*` — four instances plus the partial
   success-prefix case).
-- **L-ASSOC: 3 of 107** (`prop_lassoc_*`); **L-UNIT: 6 of 107** (`prop_lunit_*`).
-- **L-NORM: 2 of 107** (`prop_lnorm_*`); **L-TVL: 2 of 107** (`prop_ltvl_*`).
-- **Partial channel: 6 of 107** (`prop_scE_*`, `prop_embE_compose`,
+- **L-ASSOC: 3 of 109** (`prop_lassoc_*`); **L-UNIT: 6 of 109** (`prop_lunit_*`).
+- **L-NORM: 2 of 109** (`prop_lnorm_*`); **L-TVL: 2 of 109** (`prop_ltvl_*`).
+- **Partial channel: 6 of 109** (`prop_scE_*`, `prop_embE_compose`,
   `prop_storeE_roundtrip`, `prop_discE_*`).
-- **`elementE` contract: 7 of 107** (`prop_elementE_*`).
-- **Effectful rung (non-law): 12 of 107** (`prop_compM_*`, `prop_lunitM_*`,
+- **`elementE` contract: 7 of 109** (`prop_elementE_*`).
+- **Effectful rung (non-law): 12 of 109** (`prop_compM_*`, `prop_lunitM_*`,
   `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*`).
+- **Residual shape: 2 of 109** (`prop_flatten_inverse`, `prop_unflatten_inverse`).
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,

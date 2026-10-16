@@ -139,14 +139,14 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 107: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
-| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 107: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
-| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 107: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
-| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 107: `prop_lovf_*` (four instances plus the partial success-prefix case) |
-| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 107: `prop_lassoc_*` |
-| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 107: `prop_lunit_*` |
-| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 107: `prop_lnorm_*` |
-| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 107: `prop_ltvl_*` |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 109: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4) |
+| `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 109: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4) |
+| `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 109: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`) |
+| `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 109: `prop_lovf_*` (four instances plus the partial success-prefix case) |
+| `L-ASSOC` | `(f >>> g) >>> h ≅ f >>> (g >>> h)` modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | — | `composeF` construction + lawful instances | 3 of 109: `prop_lassoc_*` |
+| `L-UNIT` | `idF >>> f ≅ f` and `f >>> idF ≅ f` | — | `idF` + lawful instances | 6 of 109: `prop_lunit_*` |
+| `L-NORM` | `fromVL ∘ toVL = normalize` (extensional) | `Focal`-level (residual hidden) | `Focal.Interop` (shipped) | 2 of 109: `prop_lnorm_*` |
+| `L-TVL` | `toVL (f >>> g) ≅ toVL f ∘ toVL g` | `Focal`-level | `Focal.Interop` (shipped) | 2 of 109: `prop_ltvl_*` |
 | definitional (L2) | `plugF (composeF f g) (c1,c2) x == plugF f c1 (plugF g c2 x)` | — | `composeF`'s definition | — (definitional identities are not tested; ROADMAP 0b policy) |
 
 Derived: GP ∧ PG ∧ PP ⇒ `L-OVF`. The derivation plugs `b1 = g1 a` (PG gives the

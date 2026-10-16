@@ -26,6 +26,13 @@ module Focal.Core
     -- * Composition
   , composeF
   , (>>>)
+    -- * Residual shape
+  , Residual2
+  , Residual3
+  , flatten
+  , unflatten
+  , prettyResidual
+  , prettyResidual3
     -- * Application
   , overF
   , overFM
@@ -133,6 +140,62 @@ composeF f g = Focusing split plug
 infixr 3 >>>
 (>>>) :: Focusing c1 s t a b -> Focusing c2 a b x y -> Focusing (c1, c2) s t x y
 (>>>) = composeF
+
+-- | Residual of a two-level composition — exactly the shape 'composeF' and
+--   '(>>>)' produce.
+type Residual2 c1 c2 = (c1, c2)
+
+-- | Residual of a three-level composition in canonical right-nested form:
+--   @(c1, (c2, c3))@. This is the shape obtained by canonicalizing the
+--   left-nested pair that two successive compositions accumulate.
+type Residual3 c1 c2 c3 = (c1, (c2, c3))
+
+-- | Canonicalize a left-nested residual into 'Residual3'.
+--
+--   Law (mutual inverse with 'unflatten'):
+--   @unflatten (flatten r) == r@ for all @r :: ((c1, c2), c3)@.
+--
+--   >>> import Focal.Core (flatten)
+--   >>> flatten ((1 :: Int, "a"), True)
+--   (1,("a",True))
+flatten :: ((c1, c2), c3) -> Residual3 c1 c2 c3
+flatten ((c1, c2), c3) = (c1, (c2, c3))
+
+-- | Inverse of 'flatten': recover the left-nested residual.
+--
+--   Law (mutual inverse with 'flatten'):
+--   @flatten (unflatten r) == r@ for all @r :: Residual3 c1 c2 c3@.
+--
+--   >>> import Focal.Core (unflatten)
+--   >>> unflatten (1 :: Int, ("a", True))
+--   ((1,"a"),True)
+unflatten :: Residual3 c1 c2 c3 -> ((c1, c2), c3)
+unflatten (c1, (c2, c3)) = ((c1, c2), c3)
+
+-- | Render a residual pair as its 'show'n components joined by @\" ⋈ \"@
+--   (@U+22C8@) inside parentheses:
+--   @prettyResidual (42 :: Int, \"hi\")@ is the 'String' @(42 ⋈ \"hi\")@.
+--
+--   A prompt that displays a 'String' through 'Show' escapes the non-ASCII
+--   separator, so the doctest shows the escape:
+--
+--   >>> import Focal.Core (prettyResidual)
+--   >>> prettyResidual (42 :: Int, "hi")
+--   "(42 \8904 \"hi\")"
+prettyResidual :: (Show c1, Show c2) => (c1, c2) -> String
+prettyResidual (c1, c2) = "(" ++ show c1 ++ " ⋈ " ++ show c2 ++ ")"
+
+-- | Render a canonical 'Residual3' as its three 'show'n components joined by
+--   @\" ⋈ \"@ (@U+22C8@) inside parentheses:
+--   @prettyResidual3 (1 :: Int, (\"a\", True))@ is the 'String'
+--   @(1 ⋈ \"a\" ⋈ True)@.
+--
+--   >>> import Focal.Core (prettyResidual3)
+--   >>> prettyResidual3 (1 :: Int, ("a", True))
+--   "(1 \8904 \"a\" \8904 True)"
+prettyResidual3 :: (Show c1, Show c2, Show c3) => Residual3 c1 c2 c3 -> String
+prettyResidual3 (c1, (c2, c3)) =
+  "(" ++ show c1 ++ " ⋈ " ++ show c2 ++ " ⋈ " ++ show c3 ++ ")"
 
 -- | Apply a pure function to the focus, rebuilding the whole.
 --
