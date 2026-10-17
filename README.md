@@ -241,14 +241,14 @@ These map cleanly onto `Focusing` without adding new conceptual machinery. The r
 | 1 | **Lens-like** | Original source `s` | Pure setter | ✅ `fstF`, `sndF`, `pureF` |
 | 2 | **Zipper** | Frame stack `[Frame t]` | Structural rebuild (snapshot ‡) | ✅ `fromZip` |
 | 3 | **List position** | `(left, right)` segments | Concatenation | ✅ `elementF` |
-| 4 | **Typed Syntax** | Indexed stack `Stack j i` | Sort-checked rebuild | ❌ |
-| 5 | **Redex / Evaluation** | Evaluation context | Contraction strategy | ❌ † |
+| 4 | **Typed Syntax** | Indexed stack `Stack i j` | Sort-checked rebuild | ✅ `Focal.Syntax.Stack` |
+| 5 | **Redex / Evaluation** | Evaluation context `EvalCtx` | Context fill (strategy outside) | ✅ `Focal.Redex` † |
 
-*† Row 5 needs an extended rung (`FocusingE`/`FocusingM`) — not an instance of the `Focusing` core as shipped. ‡ `fromZip` is a snapshot constructor: `splitF` ignores its argument — see [docs/foundation.md](docs/foundation.md) §4.2; by-path focus is the dynamic `focusAt`.*
+*† Row 5 registers on the optional rung (`FocusingO`): its focus is a whole-root redex; the wider decompose-contract-plug loop reports the redex sort existentially (`Decomp`), reaching redexes below the root. ‡ `fromZip` is a snapshot constructor: `splitF` ignores its argument — see [docs/foundation.md](docs/foundation.md) §4.2; by-path focus is the dynamic `focusAt`.*
 
-- **Typed Syntax Focal** (4) is the indexed version: the residual carries both the tree path and the endpoint sorts, so a replacement with the wrong sort is a type error, not a runtime failure. It requires GADTs and type-level path tracking, which is why it's not in the initial release — but it is a natural extension of `Focal.Zipper`.
+- **Typed Syntax Focal** (4) is the indexed version: the residual carries both the tree path and the endpoint sorts, so a replacement with the wrong sort is a type error, not a runtime failure. It requires GADTs and type-level path tracking; it ships in the `focal-syntax` package (`Focal.Syntax.Stack`).
 
-- **Redex Focal** (5) is a Focal where `plug` is not structural rebuild but **operational semantics**: the evaluation context dictates how to contract the redex. This is not Lens or Zipper — it's the decompose-contract-plug loop that underlies abstract machines. Danvy and Nielsen's refocusing work shows how this loop fuses into a single state-transition function. Focal gives this a type.
+- **Redex Focal** (5) ships the decompose-contract-plug loop (`Focal.Redex`): `decompose` finds the canonical (leftmost-outermost) redex and its evaluation context, `contract` performs the beta step, and `plug` fills the context — the law-bearing direction is `plug (E, r) = t`, with the strategy outside the plug. This is not Lens or Zipper — it's the loop that underlies abstract machines; Danvy and Nielsen's refocusing work shows how it fuses into a single state-transition function. Focal gives this a type.
 
 ### Medium-strong specializations (residual carries extra semantics)
 

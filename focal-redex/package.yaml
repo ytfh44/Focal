@@ -29,6 +29,20 @@ library:
   - focal-syntax
 
 tests:
+  focal-redex-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - focal-redex
+    - focal-core
+    - focal-syntax
+    - tasty
+    - tasty-quickcheck
+    - QuickCheck
   focal-redex-doctest:
     main:                Doctest.hs
     source-dirs:         test-doctest

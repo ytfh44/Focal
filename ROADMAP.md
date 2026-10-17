@@ -140,7 +140,7 @@ Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② wi
 Depends on: 10. Done = ① modules + docs ② rung registered. [x]
 
 13. Implement Redex Focal: `decompose :: Term -> Either Value (Redex, EvalCtx)`, `plug`/`contract`/`step`, forming a decompose-contract-plug loop where `step = plug (E, contract r)`. The law-bearing direction is the context fill `plug (E, r) = t`; `contract` and the strategy stay in the evaluation layer — a `plug` that contracts breaks GP. `plug` registers through an extended rung (`FocusingE`/`FocusingM` or a new one) before any law claim.
-Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-after-decompose witness.
+Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-after-decompose witness. [x]
 
 14. Add laws for Redex Focal: plug-after-decompose, deterministic strategy, step preserves well-typedness.
 Depends on: 13. Done = ① law-ids registered ② witnesses green.

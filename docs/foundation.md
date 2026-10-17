@@ -22,8 +22,10 @@ this document and the code disagree, the code wins and this document is fixed.
 - **Optional focus** — 'FocusingO', 'composeO', 'overO', 'toOptional' (`Focal.Optional`):
   zero-or-one foci; a miss is absence with pass-through update, distinct from
   the failure channel (§3). The evaluation layer ('Focal.Redex') registers
-  against it: its residual is an evaluation context ('EvalCtx'), the absence
-  case is a value ('Value'), and the focus is a redex ('Redex').
+  against it: 'redexF' focuses whole-root redexes ('Redex') with an
+  evaluation context ('EvalCtx') as residual, and the wider 'decompose'
+  ('Decomp') reports the value side and function-slot redexes beyond the
+  rung's fixed focus sort.
 - **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
   validation, logging, and state live in the monad `m`; `FocusingE` is the
   `m = Either e` case, and a pure `Focusing` embeds by purity.
