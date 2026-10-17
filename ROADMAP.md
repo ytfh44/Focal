@@ -146,7 +146,7 @@ Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-aft
 Depends on: 13. Done = ① law-ids registered ② witnesses green. [x]
 
 15. Establish `focal-refactor`: syntax stack, span, layout, scope snapshot, type facts.
-Depends on: 10, 13. Done = ① modules + docs.
+Depends on: 10, 13. Done = ① modules + docs. [x]
 
 16. Implement binder-aware replacement: alpha-renaming, capture avoidance, scope-preserving `plug`.
 Depends on: 15. Done = ① implementation ② capture-avoidance tests.

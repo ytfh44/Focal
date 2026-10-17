@@ -25,7 +25,10 @@ this document and the code disagree, the code wins and this document is fixed.
   against it: 'redexF' focuses whole-root redexes ('Redex') with an
   evaluation context ('EvalCtx') as residual, and the wider 'decompose'
   ('Decomp') reports the value side and function-slot redexes beyond the
-  rung's fixed focus sort.
+  rung's fixed focus sort. The refactoring layer ('Focal.Refactor') builds
+  on the de Bruijn core: a top-down one-hole stack ('RCtx') addresses
+  positions, and sort facts, scope snapshots, and layout spans are carried
+  as facts alongside it.
 - **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
   validation, logging, and state live in the monad `m`; `FocusingE` is the
   `m = Either e` case, and a pure `Focusing` embeds by purity.
