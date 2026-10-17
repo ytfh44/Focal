@@ -137,7 +137,7 @@ Depends on: 9. Done = ① implementation ② negative type-error witness ③ run
 Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② witnesses green. [x]
 
 12. Establish `focal-redex`: term, value, redex, evaluation context, contract.
-Depends on: 10. Done = ① modules + docs ② rung registered.
+Depends on: 10. Done = ① modules + docs ② rung registered. [x]
 
 13. Implement Redex Focal: `decompose :: Term -> Either Value (Redex, EvalCtx)`, `plug`/`contract`/`step`, forming a decompose-contract-plug loop where `step = plug (E, contract r)`. The law-bearing direction is the context fill `plug (E, r) = t`; `contract` and the strategy stay in the evaluation layer — a `plug` that contracts breaks GP. `plug` registers through an extended rung (`FocusingE`/`FocusingM` or a new one) before any law claim.
 Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-after-decompose witness.
