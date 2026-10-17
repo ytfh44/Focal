@@ -162,7 +162,7 @@ Depends on: 16. Done = ① operations implemented ② round-trip tests per opera
 Depends on: 8. Done = ① modules + docs ② law-ids registered if claimed. [x]
 
 19. Implement structural patch focus: local replacement produces a global delta; conflicts return `Either Conflict Delta`.
-Depends on: 18. Done = ① implementation ② conflict tests.
+Depends on: 18. Done = ① implementation ② conflict tests. [x]
 
 20. Connect refactoring to delta: refactoring operations output patches, not just new ASTs.
 Depends on: 17, 19. Done = ① integration ② patch round-trip tests.

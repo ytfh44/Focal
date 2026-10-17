@@ -14,9 +14,13 @@
 --   are which edits still matter ('survives' / 'survivingPatch' — a
 --   patch's own edits can consume each other's targets) and how edits
 --   move ('reindexEdit' / 'reindexPatch' along a refactor path).  A
---   conflict is the zero-candidate case: two candidate blocks for one
---   variable, with no evidence to prefer either ('Conflict' / 'conflict'
---   — equal blocks would be one edit, so a real clash carries both).
+--   conflict is two candidate blocks for one variable ('Clash' — equal
+--   blocks would be one edit, so a real clash carries both) or the
+--   zero-candidate case, a variable that no longer occurs ('NoSite').
+--   The patch focus turns a local replacement into a global delta when
+--   its variable occurs and reports the zero-candidate conflict
+--   otherwise ('patchFocus' — the 'Either' is the patch layer's failure
+--   channel).
 --
 --   >>> :set -XDataKinds -XTypeOperators
 --   >>> import Focal.Redex
@@ -36,6 +40,16 @@
 --   Just (Clash FZ RUnit (RVar FZ))
 --   >>> conflict (Edit (FZ :: Fin '[U] U) RUnit) (Edit (FZ :: Fin '[U] U) RUnit)
 --   Nothing
+--   >>> patchFocus (Edit (FZ :: Fin '[U] U) RUnit) (RVar FZ :: Rm '[U] U)
+--   Right (Delta (Edit FZ RUnit) RUnit)
+--   >>> patchFocus (Edit (FZ :: Fin '[U] U) RUnit) (RUnit :: Rm '[U] U)
+--   Left (NoSite FZ)
+--   >>> patchFocus (Edit (FS FZ :: Fin '[U, U] U) RUnit) (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ)) :: Rm '[U, U] U)
+--   Right (Delta (Edit (FS FZ) RUnit) (RApp (RLam TyRepU (RVar FZ)) RUnit))
+--   >>> reindexDelta (RLamC TyRepU RHole :: RCtx '[U] '[U, U] U (U :-> U)) (Delta (Edit (FZ :: Fin '[U] U) RUnit) (RVar FZ :: Rm '[U] U))
+--   Delta (Edit (FS FZ) RUnit) (RVar (FS FZ))
+--   >>> countOccurrences (FZ :: Fin '[U, U] U) (RApp (RLam TyRepU (RVar (FS FZ))) (RVar FZ) :: Rm '[U, U] U)
+--   2
 module Focal.Delta
   ( samePos
   , Edit(..)
@@ -53,6 +67,11 @@ module Focal.Delta
   , reindexPatch
   , Conflict(..)
   , conflict
+  , Delta(..)
+  , patchFocus
+  , countOccurrences
+  , reindexDelta
+  , deltaOn
   ) where
 
 import Focal.Redex (Fin(..), Rm(..))
@@ -64,7 +83,7 @@ import Focal.Refactor
   , weakenFin
   , weakenRm
   )
-import Focal.Syntax (Ty)
+import Focal.Syntax (Ty, eqRep)
 
 --------------------------------------------------------------------
 -- Edits
@@ -180,12 +199,15 @@ reindexPatch k (PCons (SomeEdit e) rest) =
 -- Conflicts
 --------------------------------------------------------------------
 
--- | The conflict: two candidate blocks for one variable.  Equal blocks
---   would be one edit, so the constructor carries both.
+-- | The conflict: two candidate blocks for one variable, or the
+--   zero-candidate case — a replacement whose variable no longer occurs
+--   (nothing to replace).  Equal blocks would be one edit, so a real
+--   clash carries both.
 data Conflict (g :: [Ty]) where
-  Clash :: Fin g s -> Rm g s -> Rm g s -> Conflict g
+  Clash  :: Fin g s -> Rm g s -> Rm g s -> Conflict g
+  NoSite :: Fin g s -> Conflict g
 
--- | 'Clash' takes three precedence 11 arguments.
+-- | 'Clash' takes three precedence 11 arguments; 'NoSite' takes one.
 instance Show (Conflict g) where
   showsPrec d (Clash i a b) =
     showParen (d > 10)
@@ -196,6 +218,16 @@ instance Show (Conflict g) where
       .  showChar ' '
       .  showsPrec 11 b
       )
+  showsPrec d (NoSite i) =
+    showParen (d > 10) (showString "NoSite " . showsPrec 11 i)
+
+-- | Positional equality of conflicts, polymorphic in the compared
+--   block sorts (the existential of 'Clash' is independent on each
+--   side, so the comparison goes through 'samePos' / 'eqBlock').
+instance Eq (Conflict g) where
+  Clash i a b == Clash j c d = samePos i j && eqBlock a c && eqBlock b d
+  NoSite i    == NoSite j    = samePos i j
+  _           == _           = False
 
 -- | Two edits conflict when they target the same variable with
 --   different blocks; identical edits are one edit, not a conflict.
@@ -203,3 +235,72 @@ conflict :: Edit g s -> Edit g s -> Maybe (Conflict g)
 conflict (Edit i a) (Edit j b)
   | samePos i j, a /= b = Just (Clash i a b)
   | otherwise           = Nothing
+
+--------------------------------------------------------------------
+-- Structural patch focus
+--------------------------------------------------------------------
+
+-- | Sort-polymorphic block equality: 'Clash' and 'Edit' carry their
+--   block sort existentially, so two blocks compare positionally
+--   ('samePos' on variables, 'eqRep' on the lambda's sort witnesses).
+eqBlock :: Rm g1 t1 -> Rm g2 t2 -> Bool
+eqBlock RUnit        RUnit        = True
+eqBlock (RVar i)     (RVar j)     = samePos i j
+eqBlock (RLam r1 b1) (RLam r2 b2) = eqRep r1 r2 && eqBlock b1 b2
+eqBlock (RApp f1 x1) (RApp f2 x2) = eqBlock f1 f2 && eqBlock x1 x2
+eqBlock _            _            = False
+
+-- | A structural delta: what the local replacement changed (the edit)
+--   plus what the term became (the global result).  The residual — the
+--   unchanged remainder — is implicit in the result term.
+data Delta (g :: [Ty]) (t :: Ty) where
+  Delta :: Edit g s -> Rm g t -> Delta g t
+
+-- | 'Delta' takes two precedence 11 arguments.
+instance Show (Delta g t) where
+  showsPrec d (Delta e t') =
+    showParen (d > 10)
+      (showString "Delta " . showsPrec 11 e . showChar ' ' . showsPrec 11 t')
+
+-- | Positional equality of deltas: the edit's sort is existentially
+--   quantified on each side, so the edits compare via the conflicts'
+--   positional discipline ('samePos' / 'eqBlock' / 'eqRep'); the two
+--   result terms share the instance's sort and compare structurally.
+instance Eq (Delta g t) where
+  Delta e1 r1 == Delta e2 r2 = eqEdit e1 e2 && r1 == r2
+
+-- | Sort-polymorphic edit equality (see 'eqBlock').
+eqEdit :: Edit g1 s1 -> Edit g2 s2 -> Bool
+eqEdit (Edit i a) (Edit j b) = samePos i j && eqBlock a b
+
+-- | Apply a local replacement as a structural edit: when the edit's
+--   variable still occurs, the substitution becomes a global delta; the
+--   zero-candidate case (the variable no longer occurs — nothing to
+--   replace) is the conflict.  The 'Either' is the patch layer's
+--   failure channel: every downstream consumer takes the conflict
+--   branch explicitly rather than silently dropping the edit.
+patchFocus :: Edit g s -> Rm g t -> Either (Conflict g) (Delta g t)
+patchFocus e@(Edit i _) t
+  | survives e t = Right (Delta e (applyEdit e t))
+  | otherwise    = Left (NoSite i)
+
+-- | Number of occurrences of a variable in a term: positional, with
+--   the queried position deepening by one under each binder (mirroring
+--   'occursAt''s under-binder clause).
+countOccurrences :: Fin g s -> Rm g t -> Int
+countOccurrences _ RUnit      = 0
+countOccurrences i (RVar j)   = if samePos i j then 1 else 0
+countOccurrences i (RLam _ b) = countOccurrences (FS i) b
+countOccurrences i (RApp f x) = countOccurrences i f + countOccurrences i x
+
+-- | Reindex a delta along a refactor path: the edit transports
+--   editwise ('reindexEdit') and the result term transports with the
+--   same embedding ('weakenRm', polymorphic in the term sort).
+reindexDelta :: RCtx g h u v -> Delta g t -> Delta h t
+reindexDelta k (Delta e t) = Delta (reindexEdit k e) (weakenRm k t)
+
+-- | Apply a delta's edit to another term: the evidence travels.  The
+--   target term decides again whether the variable occurs — the same
+--   zero-candidate conflict can arise at the new site.
+deltaOn :: Delta g t -> Rm g t' -> Either (Conflict g) (Delta g t')
+deltaOn (Delta e _) = patchFocus e
