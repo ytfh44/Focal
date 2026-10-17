@@ -149,7 +149,7 @@ Depends on: 13. Done = ① law-ids registered ② witnesses green. [x]
 Depends on: 10, 13. Done = ① modules + docs. [x]
 
 16. Implement binder-aware replacement: alpha-renaming, capture avoidance, scope-preserving `plug`.
-Depends on: 15. Done = ① implementation ② capture-avoidance tests.
+Depends on: 15. Done = ① implementation ② capture-avoidance tests. [x]
 
 17. Implement basic refactoring operations: rename, extract local, inline, case split.
 Depends on: 16. Done = ① operations implemented ② round-trip tests per operation.
