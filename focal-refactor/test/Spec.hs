@@ -11,7 +11,10 @@ import Test.Tasty.QuickCheck (testProperty, (===))
 
 import Focal.Syntax (Ty(..), TyRep(..))
 import Focal.Redex (Fin(..), Rm(..))
-import Focal.Refactor (RCtx(..), frameOccurs, plugRCtx, substitute, weakenFin, weakenRm)
+import Focal.Refactor
+  ( RCtx(..), abstract, etaExpand, frameOccurs, inlineAt, plugRCtx, rename, substitute
+  , weakenFin, weakenRm
+  )
 
 main :: IO ()
 main = defaultMain tests
@@ -23,6 +26,15 @@ tests = testGroup "focal-refactor — binder-aware replacement"
       , testProperty "occurrence and non-occurrence equations" prop_rf_substitute_hits
       , testProperty "no capture under a fresh binder" prop_rf_no_capture
       , testProperty "substitution commutes with the path" prop_rf_commute
+      ]
+  , testGroup "Refactoring operations"
+      [ testProperty "rename is an involution" prop_rf_rename_involution
+      , testProperty "abstract then apply is substitution (unit argument)"
+          prop_rf_abstract_unit
+      , testProperty "abstract then apply is substitution (variable argument)"
+          prop_rf_abstract_var
+      , testProperty "eta expansion inlines back" prop_rf_eta_roundtrip
+      , testProperty "inlineAt contracts a root redex" prop_rf_inline_hits
       ]
   ]
 
@@ -58,6 +70,50 @@ prop_rf_commute = conjoin
       in  not (frameOccurs k (weakenFin k i))
             ==> substitute i a (plugRCtx k u)
                   === plugRCtx k (substitute (weakenFin k i) (weakenRm k a) u)
+
+--------------------------------------------------------------------
+-- Refactoring operations
+--------------------------------------------------------------------
+
+-- 'rename' is a transposition of two variable positions, so applying it
+-- twice restores every occurrence: an involution.  The context '[U, U]
+-- supplies the two positions; 'genBodyU2' generates terms at that
+-- context.
+prop_rf_rename_involution :: Property
+prop_rf_rename_involution = forAll genBodyU2 $ \t ->
+  rename (FS FZ :: Fin '[U, U] U) FZ (rename (FZ :: Fin '[U, U] U) (FS FZ) t) === t
+
+-- Applying 'abstract' at a variable and applying the abstraction to a
+-- term of that variable's sort reproduces 'substitute' — the beta
+-- round trip, with a real (unit) argument.
+prop_rf_abstract_unit :: Property
+prop_rf_abstract_unit = forAll genBodyU1 $ \x ->
+  inlineAt (RApp (abstract TyRepU (FZ :: Fin '[U] U) x) (RUnit :: Rm '[U] U))
+    === Just (substitute (FZ :: Fin '[U] U) (RUnit :: Rm '[U] U) x)
+
+-- Same round trip with the variable itself as the argument: the
+-- abstraction re-absorbs its own bound variable.
+prop_rf_abstract_var :: Property
+prop_rf_abstract_var = forAll genBodyU1 $ \x ->
+  inlineAt (RApp (abstract TyRepU (FZ :: Fin '[U] U) x) (RVar FZ :: Rm '[U] U))
+    === Just (substitute (FZ :: Fin '[U] U) (RVar FZ) x)
+
+-- 'etaExpand' wraps a function in a lambda that immediately applies it;
+-- the bound variable never occurs in the lifted function, so
+-- contracting the application restores the original application of the
+-- unexpanded function.
+prop_rf_eta_roundtrip :: Property
+prop_rf_eta_roundtrip = forAll genArrU1 $ \f ->
+  inlineAt (RApp (etaExpand TyRepU f) (RUnit :: Rm '[U] U)) === Just (RApp f RUnit)
+
+-- 'inlineAt' contracts exactly a root application of a lambda and
+-- refuses every other shape (no error, a 'Nothing' witness instead).
+prop_rf_inline_hits :: Property
+prop_rf_inline_hits = conjoin
+  [ inlineAt (RApp (RLam TyRepU (RVar FZ)) RUnit :: Rm '[] U) === Just RUnit
+  , inlineAt (RUnit :: Rm '[] U) === Nothing
+  , inlineAt (RLam TyRepU RUnit :: Rm '[] (U :-> U)) === Nothing
+  ]
 
 --------------------------------------------------------------------
 -- Generators

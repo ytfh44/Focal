@@ -64,12 +64,16 @@ module Focal.Refactor
   , weakenFin
   , weakenRm
   , frameOccurs
+  , rename
+  , abstract
+  , inlineAt
+  , etaExpand
   ) where
 
 import Data.Maybe (mapMaybe)
 import Data.Type.Equality ((:~:)(Refl))
 
-import Focal.Redex (Fin(..), Rm(..), lift1)
+import Focal.Redex (Fin(..), Redex(..), Rm(..), contract, lift1)
 import Focal.Syntax (Ty(..), TyRep(..))
 
 -- | The refactor syntax stack: the path from the root to a hole.  @g@ is
@@ -317,3 +321,69 @@ frameOccurs (RAppL x k) i      = occursAt i x || frameOccurs k i
 frameOccurs (RAppR f k) i      = occursAt i f || frameOccurs k i
 frameOccurs (RLamC _ _) FZ     = False
 frameOccurs (RLamC _ k) (FS i) = frameOccurs k i
+
+--------------------------------------------------------------------
+-- Basic refactoring operations
+--------------------------------------------------------------------
+
+-- | Alpha-rename by transposition: swap the roles of two variable
+--   positions.  An involution — renaming twice with the same pair is
+--   the identity, which the round-trip property witnesses.
+--
+--   In a de Bruijn encoding this IS alpha-renaming: indices name
+--   binders, so moving an index is the whole operation.  The operation
+--   is total on any pair of positions; a target position the term does
+--   not otherwise use is simply a fresh name.
+--
+--   >>> rename (FS FZ :: Fin '[U, U] U) FZ (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ)) :: Rm '[U, U] U)
+--   RApp (RLam TyRepU (RVar FZ)) (RVar FZ)
+--   >>> rename (FZ :: Fin '[U, U] U) (FS FZ) (rename (FZ :: Fin '[U, U] U) (FS FZ) (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ)) :: Rm '[U, U] U))
+--   RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ))
+rename :: Fin g s -> Fin g s -> Rm g t -> Rm g t
+rename _ _ RUnit      = RUnit
+rename i j (RVar k)   = case eqFinRefl i k of
+  Just Refl -> RVar j
+  Nothing   -> case eqFinRefl j k of
+    Just Refl -> RVar i
+    Nothing   -> RVar k
+rename i j (RLam r b) = RLam r (rename (FS i) (FS j) b)
+rename i j (RApp f x) = RApp (rename i j f) (rename i j x)
+
+-- | Abstract a variable into a lambda: occurrences of the variable
+--   become the bound variable.  The dual of 'substitute' — composing
+--   the two (apply the abstraction to a term of the variable's sort)
+--   reproduces plain substitution, which the round-trip property
+--   witnesses through 'inlineAt'.
+--
+--   >>> abstract TyRepU FZ (RVar FZ :: Rm '[U] U)
+--   RLam TyRepU (RVar FZ)
+abstract :: TyRep s -> Fin g s -> Rm g t -> Rm g (s :-> t)
+abstract r i t = RLam r (substitute (FS i) (RVar FZ) (lift1 t))
+
+-- | Contract the beta-redex at the root of an application whose
+--   function is already a lambda.  'Nothing' when the term is not such
+--   an application — there is no contraction site at the root — so the
+--   operation stays total in its domain without any 'error' escape.
+--
+--   >>> inlineAt (RApp (RLam TyRepU (RVar FZ)) RUnit :: Rm '[] U)
+--   Just RUnit
+--   >>> inlineAt (RUnit :: Rm '[] U)
+--   Nothing
+--   >>> inlineAt (RLam TyRepU RUnit :: Rm '[] (U :-> U))
+--   Nothing
+inlineAt :: Rm g t -> Maybe (Rm g t)
+inlineAt (RApp (RLam r b) x) = Just (contract (Beta r b x))
+inlineAt _                   = Nothing
+
+-- | Eta-expand a function term: wrap it in a lambda that immediately
+--   applies it.  The grammar's case-analogue — the simply-typed lambda
+--   calculus over 'U' has no sum or case constructs, so the only
+--   constructor-splitting operation the grammar affords is this
+--   lambda-introduction at a function-sorted term.  Always inlinable
+--   back: the bound variable never occurs in the lifted term, so
+--   @'inlineAt' ('RApp' ('etaExpand' r f) a)@ returns @'Just' ('RApp' f a)@.
+--
+--   >>> etaExpand TyRepU (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
+--   RLam TyRepU (RApp (RLam TyRepU (RVar FZ)) (RVar FZ))
+etaExpand :: TyRep s -> Rm g (s :-> t) -> Rm g (s :-> t)
+etaExpand r f = RLam r (RApp (lift1 f) (RVar FZ))
