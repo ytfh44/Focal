@@ -143,7 +143,7 @@ Depends on: 10. Done = ① modules + docs ② rung registered. [x]
 Depends on: 12, 0e. Done = ① loop implemented ② rung registered ③ plug-after-decompose witness. [x]
 
 14. Add laws for Redex Focal: plug-after-decompose, deterministic strategy, step preserves well-typedness.
-Depends on: 13. Done = ① law-ids registered ② witnesses green.
+Depends on: 13. Done = ① law-ids registered ② witnesses green. [x]
 
 15. Establish `focal-refactor`: syntax stack, span, layout, scope snapshot, type facts.
 Depends on: 10, 13. Done = ① modules + docs.

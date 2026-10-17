@@ -28,7 +28,7 @@ not an instance (projection).
 | `Focal.Effectful` (`FocusingM`, `composeM`, `overM`, `storeM`) | — | — | — | — | — | GP/PG as Kleisli equations (PG in continuation form); PP as the replay-prefix equation, per instance (foundation §3) | `prop_lgpM_*`, `prop_lpgM_*`, `prop_lppM_*`, `prop_compM_*`, `prop_lunitM_*`, `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*` | GP/PG composition closure holds for every monad; `prop_discM_*` pins the forced premises |
 | `Focal.Generic` (`Derivative1`, `Ctx1`, `genericSplit1`, `genericPlug1`, `genericFocus`) | ✓ | ✓ | ✓ | — | ✓ | direct occurrences only (leftmost); a value whose parameter has no reachable direct occurrence is outside the declared domain — `genericSplit1` returns `Nothing`, `splitF` raises the registered delayed `error` (foundation §4.1) | `prop_gen_split_plug`, `prop_gen_rose_gp`, `prop_gen_rose_pg`, `prop_gen_rose_pp` | one-hole contexts derived from `Generic1`; `Rose` migrated (root label) |
 | `Focal.Syntax` (`Stack i j`, `splitStack`, `plugStack`) | ✓ | ✓ | ✓ | — | ✓ | split needs the target sort's `TyRep`; a wrong-sort replacement is a type error (negative witness `focal-syntax/negative/SortMismatch.hs`) | `prop_tm_gp`, `prop_tm_path`, `prop_tm_pp`; the negative-witness command | sort-indexed contexts; `FocusingO` rung; suite lives in the `focal-syntax` package |
-| `Focal.Redex` (`decompose`, `Decomp`, `step`, `redexF`) | ✓ | — | — | — | ✓ | closed terms (`'[]` context); `decompose` is total — the `RVar` case is uninhabited and closes by `EmptyCase`; `redexF` focuses whole-root redexes (its focus sort is fixed, so redexes below the root are reached by `decompose` alone) | `prop_rd_decompose_*`, `prop_rd_plug_*`, `prop_rd_step_*`, `prop_rd_redexF_*` (focal-redex suite) | GP direction: plug-after-decompose (`plugO redexF e r = plugEval e (redexTerm r)`); canonical leftmost-outermost; `plugEval`/`contract` carry no strategy; suite lives in the `focal-redex` package |
+| `Focal.Redex` (`decompose`, `Decomp`, `step`, `redexF`) | ✓ | — | — | — | ✓ | closed terms (`'[]` context); `decompose` is total — the `RVar` case is uninhabited and closes by `EmptyCase`; `redexF` focuses whole-root redexes (its focus sort is fixed, so redexes below the root are reached by `decompose` alone) | `prop_rd_decompose_*`, `prop_rd_plug_*`, `prop_rd_step_*`, `prop_rd_redexF_*` (concrete); `prop_rd_plug`, `prop_rd_progress`, `prop_rd_norm`, `prop_rd_head` (laws) | GP direction: plug-after-decompose (`plugO redexF e r = plugEval e (redexTerm r)`); laws: plug-after-decompose, progress (step defined exactly off the values), normalization to a value; type preservation is the L0 result sort of `step` (`Rm '[] t -> Maybe (Rm '[] t)`), by construction — no property witnesses it; deterministic strategy pinned by the concrete canonicity regressions; `plugEval`/`contract` carry no strategy; suite lives in the `focal-redex` package |
 
 Verdict footnotes:
 
@@ -69,9 +69,10 @@ plus the doctest suite):
 - **Optional focus: 6 of 136** (`prop_opt_*`).
 - **Typed syntax (focal-syntax suite): 3 properties** (`prop_tm_*`) — registered
   per package; the root total stays 136 until item 31 unifies the vocabulary.
-- **Redex loop (focal-redex suite): 14 properties** (`prop_rd_*`) — concrete
-  regressions for decompose/plug/step plus the `redexF` rung trio; registered
-  per package; the root total stays 136.
+- **Redex loop (focal-redex suite): 18 properties** (`prop_rd_*`) — 14 concrete
+  regressions (decompose/plug/step plus the `redexF` rung trio) and 4 laws
+  (plug-after-decompose, progress, normalization, head step = beta);
+  registered per package; the root total stays 136.
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,

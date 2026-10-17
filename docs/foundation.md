@@ -156,7 +156,7 @@ scheduled in `ROADMAP.md`.
 
 | law-id | Statement | Well-formed (mono) conditions | Obligation bearer | Witness |
 |---|---|---|---|---|
-| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 136: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4); typed `prop_tm_gp` (in the `focal-syntax` suite) |
+| `L-GP` | `plugF f (snd (splitF f s)) (fst (splitF f s)) == s` | `s ~ t`, `a ~ b` | Lawful instances (A-LENS clause 1) | 15 of 136: `prop_lgp_*` (8), partial `prop_lgpE_*` (3), effectful `prop_lgpM_*` (4); typed `prop_tm_gp` (in the `focal-syntax` suite); redex `prop_rd_plug`, `prop_rd_redexF_plug` (in the `focal-redex` suite) |
 | `L-PG` | `c ∈ residual image  ⇒  fst (splitF f (plugF f c b)) == b` | `s ~ t`, `a ~ b` | Lawful instances (clause 2) | 13 of 136: `prop_lpg_*` (7), partial `prop_lpgE_*` (2), effectful `prop_lpgM_*` (4); typed `prop_tm_path` (in the `focal-syntax` suite) |
 | `L-PP` | `let (_, c') = splitF f (plugF f c b1) in plugF f c' b2 == plugF f c b2`, for `c ∈ residual image` | `s ~ t` | Lawful instances (clause 3) | 9 of 136: `prop_lpp_*` (5), partial `prop_lppE_*` (2), effectful `prop_lppM_*` (2) (one trivially-satisfied snapshot case, `prop_lpp_fromZip`); typed `prop_tm_pp` (in the `focal-syntax` suite) |
 | `L-OVF` | `overF f (g . h) == overF f g . overF f h` (heterogeneous shapes well-formed when `h :: a -> a`) | — | Lawful instances; implied by GP ∧ PG ∧ PP | 5 of 136: `prop_lovf_*` (four instances plus the partial success-prefix case) |

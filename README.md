@@ -215,7 +215,7 @@ The focus `a` might be a single element (Lens, Zipper), an optional element (Pri
 
 ### Dimension 3: How does `plug` operate?
 - **Pure structural rebuild** — trust the residual to reconstruct (Lens, Zipper, List)
-- **Strategy reduction** — evaluation contexts dictate the order of contraction (Redex)
+- **Context fill** — the residual is an evaluation context; the fill itself is structural, and contraction lives in the surrounding decompose-contract loop (Redex)
 - **Change propagation** — the residual guides how a local delta becomes a global delta (Incremental, Patch)
 - **Database transaction** — the residual encodes a view-update policy (Persistence, Query)
 - **Validation gate** — the residual contains a validator that either accepts or rejects the replacement (UI/Form, Workflow)
