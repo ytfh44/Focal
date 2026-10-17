@@ -128,7 +128,7 @@ Tracked elsewhere (closure layer): canonical residual products (`7a`); law-reuse
 ## P3 — Typed syntax, redex, refactoring (items 9–17)
 
 9. Establish `focal-syntax`: typed AST examples, sort kinds, GADT nodes, typed paths.
-Depends on: 8. Done = ① modules + example AST ② rung registered in `docs/foundation.md` §1.
+Depends on: 8. Done = ① modules + example AST ② rung registered in `docs/foundation.md` §1. [x]
 
 10. Implement Typed Syntax Focal: `Stack i j`, sort-checked `split`, sort-checked `plug`; a wrong-sort replacement must not type-check.
 Depends on: 9. Done = ① implementation ② negative type-error witness ③ rung registered.

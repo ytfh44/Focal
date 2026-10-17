@@ -31,6 +31,10 @@ this document and the code disagree, the code wins and this document is fixed.
   delegate; products are left-biased; constants, `U1`, `V1`, and recursive
   children have no direct occurrence). Holes under recursive children remain
   the zipper's frame-stack territory.
+- **Typed syntax** — 'Ty' / 'Tm' ('Focal.Syntax'): a sort-indexed example
+  language (sorts as a data kind; terms as a sort-indexed GADT); the
+  sort-indexed context rung is 'Stack i j' ('Focal.Syntax.Stack'), whose
+  split requires the target sort's 'TyRep'.
 
 | Level | Name | What it is | Enforced by | Violation consequence |
 |---|---|---|---|---|
