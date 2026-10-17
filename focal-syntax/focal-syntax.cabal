@@ -21,6 +21,7 @@ source-repository head
 library
   exposed-modules:
       Focal.Syntax
+      Focal.Syntax.Stack
   other-modules:
       Paths_focal_syntax
   autogen-modules:
@@ -47,4 +48,23 @@ test-suite focal-syntax-doctest
       base >=4.16 && <5
     , doctest
     , focal-core
+  default-language: Haskell2010
+
+test-suite focal-syntax-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_focal_syntax
+  autogen-modules:
+      Paths_focal_syntax
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , base >=4.16 && <5
+    , focal-core
+    , focal-syntax
+    , tasty
+    , tasty-quickcheck
   default-language: Haskell2010

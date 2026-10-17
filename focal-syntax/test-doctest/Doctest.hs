@@ -6,4 +6,5 @@ main :: IO ()
 main = doctest
   [ "-isrc"
   , "src/Focal/Syntax.hs"
+  , "src/Focal/Syntax/Stack.hs"
   ]

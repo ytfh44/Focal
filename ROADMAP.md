@@ -131,7 +131,7 @@ Tracked elsewhere (closure layer): canonical residual products (`7a`); law-reuse
 Depends on: 8. Done = ① modules + example AST ② rung registered in `docs/foundation.md` §1. [x]
 
 10. Implement Typed Syntax Focal: `Stack i j`, sort-checked `split`, sort-checked `plug`; a wrong-sort replacement must not type-check.
-Depends on: 9. Done = ① implementation ② negative type-error witness ③ rung registered.
+Depends on: 9. Done = ① implementation ② negative type-error witness ③ rung registered. [x]
 
 11. Add laws for Typed Syntax Focal: well-sorted round-trip, path preservation, ill-sorted replacement rejection.
 Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② witnesses green.

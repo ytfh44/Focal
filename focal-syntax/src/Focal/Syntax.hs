@@ -21,6 +21,8 @@ module Focal.Syntax
   , TyRep(..)
   , Tm(..)
   , tyRepOf
+  , eqRep
+  , eqTm
   , exUnit
   , exConst
   , exApp
