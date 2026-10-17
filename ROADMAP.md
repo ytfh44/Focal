@@ -159,7 +159,7 @@ Depends on: 16. Done = ① operations implemented ② round-trip tests per opera
 ## P4 — Delta and incrementality (items 18–22)
 
 18. Establish `focal-delta`: `Delta`, survival witness, reindexing witness, conflict type.
-Depends on: 8. Done = ① modules + docs ② law-ids registered if claimed.
+Depends on: 8. Done = ① modules + docs ② law-ids registered if claimed. [x]
 
 19. Implement structural patch focus: local replacement produces a global delta; conflicts return `Either Conflict Delta`.
 Depends on: 18. Done = ① implementation ② conflict tests.
