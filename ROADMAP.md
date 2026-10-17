@@ -152,7 +152,7 @@ Depends on: 10, 13. Done = ① modules + docs. [x]
 Depends on: 15. Done = ① implementation ② capture-avoidance tests. [x]
 
 17. Implement basic refactoring operations: rename, extract local, inline, case split.
-Depends on: 16. Done = ① operations implemented ② round-trip tests per operation.
+Depends on: 16. Done = ① operations implemented ② round-trip tests per operation. [x]
 
 ---
 
