@@ -134,7 +134,7 @@ Depends on: 8. Done = ① modules + example AST ② rung registered in `docs/fou
 Depends on: 9. Done = ① implementation ② negative type-error witness ③ rung registered. [x]
 
 11. Add laws for Typed Syntax Focal: well-sorted round-trip, path preservation, ill-sorted replacement rejection.
-Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② witnesses green.
+Depends on: 10. Done = ① law-ids registered in `docs/foundation.md` §3 ② witnesses green. [x]
 
 12. Establish `focal-redex`: term, value, redex, evaluation context, contract.
 Depends on: 10. Done = ① modules + docs ② rung registered.

@@ -27,6 +27,7 @@ not an instance (projection).
 | `Focal.Optional` (`FocusingO`, `composeO`, `overO`, `toOptional`) | ✓ | ✓ | ✓ | — | ✓ | absence ≠ failure: a miss is `Nothing` with no payload; the miss laws have defined behavior (foundation §3) | `prop_opt_*` | zero-or-one foci; hit-domain GP/PG/PP plus pass-through miss; `composeO` short-circuits on the first miss |
 | `Focal.Effectful` (`FocusingM`, `composeM`, `overM`, `storeM`) | — | — | — | — | — | GP/PG as Kleisli equations (PG in continuation form); PP as the replay-prefix equation, per instance (foundation §3) | `prop_lgpM_*`, `prop_lpgM_*`, `prop_lppM_*`, `prop_compM_*`, `prop_lunitM_*`, `prop_lassocM_*`, `prop_storeM_*`, `prop_embM*`, `prop_discM_*` | GP/PG composition closure holds for every monad; `prop_discM_*` pins the forced premises |
 | `Focal.Generic` (`Derivative1`, `Ctx1`, `genericSplit1`, `genericPlug1`, `genericFocus`) | ✓ | ✓ | ✓ | — | ✓ | direct occurrences only (leftmost); a value whose parameter has no reachable direct occurrence is outside the declared domain — `genericSplit1` returns `Nothing`, `splitF` raises the registered delayed `error` (foundation §4.1) | `prop_gen_split_plug`, `prop_gen_rose_gp`, `prop_gen_rose_pg`, `prop_gen_rose_pp` | one-hole contexts derived from `Generic1`; `Rose` migrated (root label) |
+| `Focal.Syntax` (`Stack i j`, `splitStack`, `plugStack`) | ✓ | ✓ | ✓ | — | ✓ | split needs the target sort's `TyRep`; a wrong-sort replacement is a type error (negative witness `focal-syntax/negative/SortMismatch.hs`) | `prop_tm_gp`, `prop_tm_path`, `prop_tm_pp`; the negative-witness command | sort-indexed contexts; `FocusingO` rung; suite lives in the `focal-syntax` package |
 
 Verdict footnotes:
 
@@ -65,6 +66,8 @@ plus the doctest suite):
 - **Navigation algebra: 7 of 136** (`prop_nav_*`).
 - **Generic derivation: 4 of 136** (`prop_gen_*`).
 - **Optional focus: 6 of 136** (`prop_opt_*`).
+- **Typed syntax (focal-syntax suite): 3 properties** (`prop_tm_*`) — registered
+  per package; the root total stays 136 until item 31 unifies the vocabulary.
 - The remaining 27 properties: 3 occurrence≠value corollaries, 5 zipper
   law/navigation tests, 2 snapshot contracts (`prop_contract_zip_*`),
   2 law discriminators (`prop_disc_*`), 8 `focusAt` tests, 3 `elementAt` tests,
