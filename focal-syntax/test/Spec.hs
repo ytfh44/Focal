@@ -20,7 +20,7 @@ tests = testGroup "focal-syntax — sort-indexed contexts"
       , testProperty "plugStack (AppR exConst Hole) TUnit = exApp" prop_stack_appR
       , testProperty "plugStack (LamS TyRepU Hole) TUnit = exConst" prop_stack_lamS
       ]
-  , testGroup "Typed syntax — sort-indexed laws (ROADMAP 11)"
+  , testGroup "Typed syntax — sort-indexed laws"
       [ testProperty "hit => plugStack c a = t" prop_tm_gp
       , testProperty "splitStack ri (plugStack c b) = Just (b, c)" prop_tm_path
       , testProperty "plugStack c' b2 = plugStack c b2 on the residual image" prop_tm_pp
@@ -68,7 +68,7 @@ genArr n = oneof
   ]
 
 --------------------------------------------------------------------
--- Laws (ROADMAP 11)
+-- Laws — sort-indexed contexts
 --------------------------------------------------------------------
 
 -- | Well-sorted round-trip, plug side: whenever the canonical split finds

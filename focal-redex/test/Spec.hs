@@ -36,7 +36,7 @@ tests = testGroup "focal-redex — canonical decomposition"
       , testProperty "redexF plug rebuilds the term" prop_rd_redexF_plug
       , testProperty "redexF miss on a value" prop_rd_redexF_miss
       ]
-  , testGroup "Redex laws (ROADMAP 14)"
+  , testGroup "Redex laws"
       [ testProperty "plug-after-decompose over generated closed terms" prop_rd_plug
       , testProperty "step is defined exactly off the values" prop_rd_progress
       , testProperty "normalization reaches a value" prop_rd_norm
@@ -183,7 +183,7 @@ genBodyArrDomN n = oneof
   ]
 
 --------------------------------------------------------------------
--- Laws (ROADMAP 14)
+-- Laws — canonical decomposition
 --------------------------------------------------------------------
 
 -- | Plug-after-decompose: plugging the focus back through its context

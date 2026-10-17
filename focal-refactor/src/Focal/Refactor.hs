@@ -11,6 +11,10 @@
 --   position-addressed edits; 'TyCtx' + 'rmRepOf' recover sort facts at
 --   any node; scope snapshots collect a subterm's free variables; the
 --   flat renderer assigns every node a text 'Span' keyed by its path.
+--   In a de Bruijn encoding alpha-renaming is positional (indices name
+--   binders), so the load-bearing replacement operations are
+--   capture-avoiding substitution ('substitute') and scope-preserving
+--   transport ('weakenFin' / 'weakenRm').
 --
 --   >>> :set -XDataKinds -XTypeOperators
 --   >>> import Focal.Redex
@@ -33,6 +37,12 @@
 --   ("unit",[Spanned RHole (Span 0 4)])
 --   >>> snapRep (snapshot TxCNil RHole (RLam TyRepU (RVar FZ)))
 --   TyRepArr TyRepU TyRepU
+--   >>> substitute (FZ :: Fin '[U, U] U) (RVar (FS FZ)) (RVar FZ :: Rm '[U, U] U)
+--   RVar (FS FZ)
+--   >>> substitute (FZ :: Fin '[U, U] U) (RVar (FS FZ)) (RLam TyRepU (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ))) :: Rm '[U, U] (U :-> U))
+--   RLam TyRepU (RApp (RLam TyRepU (RVar FZ)) (RVar (FS (FS FZ))))
+--   >>> weakenRm (RLamC TyRepU RHole :: RCtx '[U] '[U, U] U (U :-> U)) (RVar FZ :: Rm '[U] U)
+--   RVar (FS FZ)
 module Focal.Refactor
   ( RCtx(..)
   , plugRCtx
@@ -41,6 +51,7 @@ module Focal.Refactor
   , rmRepOf
   , SomeFin(..)
   , occurs
+  , occursAt
   , usedFins
   , Span(..)
   , prettyRm
@@ -48,11 +59,17 @@ module Focal.Refactor
   , renderSpans
   , ScopeSnapshot(..)
   , snapshot
+  , substitute
+  , eqFinRefl
+  , weakenFin
+  , weakenRm
+  , frameOccurs
   ) where
 
 import Data.Maybe (mapMaybe)
+import Data.Type.Equality ((:~:)(Refl))
 
-import Focal.Redex (Fin(..), Rm(..))
+import Focal.Redex (Fin(..), Rm(..), lift1)
 import Focal.Syntax (Ty(..), TyRep(..))
 
 -- | The refactor syntax stack: the path from the root to a hole.  @g@ is
@@ -141,6 +158,15 @@ occurs FZ (RVar (FS _))     = False
 occurs (FS i) (RVar (FS j)) = eqFinPos i j
 occurs i (RLam _ b)         = occurs (FS i) b
 occurs i (RApp f x)         = occurs i f || occurs i x
+
+-- | Same-context variant of 'occurs': the variable and the term live in
+--   one arbitrary context (no cons shape is assumed), so the comparison
+--   is purely positional ('eqFinPos') and a binder deepens the index.
+occursAt :: Fin g s -> Rm g t -> Bool
+occursAt _ RUnit          = False
+occursAt i (RVar j)       = eqFinPos i j
+occursAt i (RLam _ b)     = occursAt (FS i) b
+occursAt i (RApp f x)     = occursAt i f || occursAt i x
 
 -- | Drop a binder's own variable: 'FZ' (the binder's variable) maps to
 --   'Nothing', every deeper variable shifts down by one.
@@ -243,3 +269,51 @@ pathCtx (RLamC rv k) gC = TxCCons rv (pathCtx k gC)
 
 snapshot :: TyCtx g -> RCtx g h s t -> Rm h s -> ScopeSnapshot g h s t
 snapshot gC k tm = ScopeSnapshot k tm (usedFins tm) (rmRepOf (pathCtx k gC) tm)
+
+--------------------------------------------------------------------
+-- Binder-aware replacement
+--------------------------------------------------------------------
+
+-- | Sort-refining positional equality of variables in one context: two
+--   variables at the same de Bruijn position name the same sort.
+eqFinRefl :: Fin g s -> Fin g t -> Maybe (s :~: t)
+eqFinRefl FZ     FZ     = Just Refl
+eqFinRefl (FS i) (FS j) = eqFinRefl i j
+eqFinRefl _       _      = Nothing
+
+-- | Substitute every occurrence of a variable by a term.  Under each
+--   binder the index deepens and the replacement weakens ('lift1'), so
+--   no binder can capture the replacement's variables (capture
+--   avoidance).
+substitute :: Fin g s -> Rm g s -> Rm g t -> Rm g t
+substitute _ _ RUnit      = RUnit
+substitute i a (RVar j)   = case eqFinRefl i j of
+  Just Refl -> a
+  Nothing   -> RVar j
+substitute i a (RLam r b) = RLam r (substitute (FS i) (lift1 a) b)
+substitute i a (RApp f x) = RApp (substitute i a f) (substitute i a x)
+
+-- | Transport a root variable along a refactor path: every binder
+--   crossed deepens the index by one.
+weakenFin :: RCtx g h s t -> Fin g s' -> Fin h s'
+weakenFin RHole i        = i
+weakenFin (RAppL _ k) i  = weakenFin k i
+weakenFin (RAppR _ k) i  = weakenFin k i
+weakenFin (RLamC _ k) i  = FS (weakenFin k i)
+
+-- | Transport a root-context term along a refactor path.
+weakenRm :: RCtx g h s t -> Rm g s' -> Rm h s'
+weakenRm RHole u        = u
+weakenRm (RAppL _ k) u  = weakenRm k u
+weakenRm (RAppR _ k) u  = weakenRm k u
+weakenRm (RLamC _ k) u  = lift1 (weakenRm k u)
+
+-- | Does a hole-context variable occur in the path's frame terms (the
+--   @Rm@s carried by 'RAppL'/'RAppR' frames)?  'RHole' has no frames;
+--   a binder's own variable is not in the frames' scope.
+frameOccurs :: RCtx g h s t -> Fin h s' -> Bool
+frameOccurs RHole _            = False
+frameOccurs (RAppL x k) i      = occursAt i x || frameOccurs k i
+frameOccurs (RAppR f k) i      = occursAt i f || frameOccurs k i
+frameOccurs (RLamC _ _) FZ     = False
+frameOccurs (RLamC _ k) (FS i) = frameOccurs k i
