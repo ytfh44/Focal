@@ -137,10 +137,14 @@ survives (Edit i _) = occursAt i
 reindexEdit :: RCtx g h u v -> Edit g s -> Edit h s
 reindexEdit k (Edit i a) = Edit (weakenFin k i) (weakenRm k a)
 
--- | Sequential composition of two edits at the same variable: the
---   second block is transformed by the first.  The composition law
---   (applying the composite equals applying first one then the other)
---   holds when the second block does not mention the variable.
+-- | Evidence transport for two edits at the same variable: the second
+--   block is transformed by the first (@applyEdit e1 a'@), so the
+--   composite's block is stated in the pre-@e1@ world.
+--
+--   This is NOT the sequential-application law in general: when the
+--   first edit removes the variable's occurrences, the sequential
+--   application makes the second edit a no-op while the composite still
+--   fires — the divergence is pinned by 'prop_dl_compose_divergence'.
 composeEdit :: Edit g s -> Edit g s -> Edit g s
 composeEdit e1 (Edit i a') = Edit i (applyEdit e1 a')
 

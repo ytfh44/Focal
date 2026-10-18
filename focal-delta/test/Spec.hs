@@ -14,8 +14,8 @@ import Focal.Refactor
   ( RCtx(..), occursAt, rename, substitute, weakenFin, weakenRm
   )
 import Focal.Delta
-  ( Conflict(..), Delta(..), Edit(..), applyEdit, deltaOn, inlineApply
-  , patchFocus, reindexDelta, renameEdit, samePos, survives
+  ( Conflict(..), Delta(..), Edit(..), applyEdit, composeEdit, deltaOn
+  , inlineApply, patchFocus, reindexDelta, renameEdit, samePos, survives
   )
 
 main :: IO ()
@@ -32,6 +32,8 @@ tests = testGroup "focal-delta — structural patch focus"
           prop_dl_reindex
       , testProperty "evidence travels to other terms"
           prop_dl_delta_on
+      , testProperty "compose transports the second block (divergence boundary)"
+          prop_dl_compose_divergence
       ]
   , testGroup "Refactoring bridge"
       [ testProperty "rename through the edit layer reproduces the operation (fresh target)"
@@ -114,6 +116,22 @@ prop_dl_delta_on = forAll genBodyU1 $ \t1 -> forAll genBodyU1 $ \t2 ->
         property (not (survives (Edit (FZ :: Fin '[U] U) (RVar FZ)) t2))
       Left _             -> property False
       Right (Delta _ t') -> t' === substitute (FZ :: Fin '[U] U) (RVar FZ) t2
+
+-- | The composite transports the second block; it diverges from
+--   sequential application when the first edit removes the variable
+--   (the documented boundary).
+prop_dl_compose_divergence :: Property
+prop_dl_compose_divergence =
+  conjoin
+    [ occursAt (FZ :: Fin '[U, U] U) (RVar (FS FZ) :: Rm '[U, U] U) === False
+    , applyEdit (Edit (FZ :: Fin '[U, U] U) RUnit)
+        (applyEdit (Edit (FZ :: Fin '[U, U] U) RUnit) (RVar FZ :: Rm '[U, U] U))
+        === RUnit
+    , applyEdit (composeEdit (Edit (FZ :: Fin '[U, U] U) RUnit)
+                             (Edit (FZ :: Fin '[U, U] U) (RVar (FS FZ))))
+        (RVar FZ :: Rm '[U, U] U)
+        === RVar (FS FZ)
+    ]
 
 --------------------------------------------------------------------
 -- Refactoring bridge
