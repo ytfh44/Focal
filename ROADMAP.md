@@ -186,7 +186,7 @@ Depends on: 6, 19. Done = ① modules + docs. [x]
 Depends on: 23. Done = ① implementation ② validation tests. [x]
 
 25. Establish `focal-parser`: parser state, grammar choice provenance, parse forest node focus.
-Depends on: 6, 10, 19. Done = ① modules + docs.
+Depends on: 6, 10, 19. Done = ① modules + docs. [x]
 
 26. Implement grammar focus: parse forest local replacement, ambiguity preservation, non-tree residual.
 Depends on: 25. Done = ① implementation ② ambiguity tests.
