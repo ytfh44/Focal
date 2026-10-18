@@ -198,7 +198,7 @@ Depends on: 19, 26. Done = ① modules + docs. [x]
 Depends on: 27. Done = ① implementation ② policy tests. [x]
 
 29. Establish `focal-workflow`: transition context, rollback plan, validation gate.
-Depends on: 6, 19, 24. Done = ① modules + docs.
+Depends on: 6, 19, 24. Done = ① modules + docs. [x]
 
 30. Implement workflow plug: current task replacement -> transition validation -> `Either InvalidTransition Workflow`.
 Depends on: 29. Done = ① implementation ② transition tests.
