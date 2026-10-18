@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Test.QuickCheck (Property)
+import Test.QuickCheck (Property, conjoin)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.QuickCheck (testProperty, (===))
 
@@ -28,6 +28,7 @@ tests = testGroup "focal-form — form putback"
       , testProperty "the edit overwrites its key" prop_fm_putback_overwrites
       , testProperty "revalidation keeps the original provenance" prop_fm_revalidate_provenance
       , testProperty "form validation is all-or-nothing" prop_fm_validate_form_allornothing
+      , testProperty "a normalizing validator's adopted value reaches the model" prop_fm_adopts_value
       ]
   ]
 
@@ -93,3 +94,22 @@ prop_fm_validate_form_allornothing =
     snap0  = ModelSnapshot []
     pEmail = WidgetPath ["form", "email"]
     pName  = WidgetPath ["form", "name"]
+
+-- | Adoption: a normalizing validator's value (its 'Right' result) is
+--   what the model stores — the raw input never reaches the model.
+--   The policy holds in both write paths: the single-field putback and
+--   the all-or-nothing form validation.
+prop_fm_adopts_value :: Property
+prop_fm_adopts_value = conjoin
+  [ putback vs0 snap0 (Field pEmail " a b " "email")
+      === PutbackOk (ModelSnapshot [("email", "ab")])
+  , validateForm vs0 snap0 [Field pEmail " a b " "email"]
+      === Right (ModelSnapshot [("email", "ab")])
+  ]
+  where
+    trim :: String -> Either String String
+    trim s = Right (filter (/= ' ') s)
+
+    vs0    = [("email", trim)]
+    snap0  = ModelSnapshot []
+    pEmail = WidgetPath ["form", "email"]

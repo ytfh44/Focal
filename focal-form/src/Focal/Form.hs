@@ -9,9 +9,10 @@
 --   where it came from.  The model snapshot ('ModelSnapshot') is what a
 --   delta would patch: validate-then-apply is all-or-nothing — any
 --   failure leaves the snapshot untouched and reports EVERY failure
---   ('validateForm'); applied fields overwrite their model key and keys
---   the form does not mention persist (re-validation preserves the rest
---   of the model).  The field residual ('FieldResidual') is what a
+--   ('validateForm'); an applied field stores the validator's adopted
+--   value (its 'Right' result), not the raw input — and keys the form
+--   does not mention persist (re-validation preserves the rest of the
+--   model).  The field residual ('FieldResidual') is what a
 --   failed validation preserves — the raw input plus the ORIGINAL path
 --   and kind, so the error is reproducible and the user's input is never
 --   lost; 'revalidate' re-runs a residual against a different registry
@@ -36,6 +37,9 @@
 --   PutbackOk (ModelSnapshot [("email","a@b"),("user","u")])
 --   >>> putback [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) (Field (WidgetPath ["form", "email"]) "" "email")
 --   PutbackError (FormError form/email "empty") (FieldResidual form/email "" "email")
+--   >>> let trim s = Right (filter (/= ' ') s)
+--   >>> putback [("email", trim)] (ModelSnapshot []) (Field (WidgetPath ["f", "email"]) " a b " "email")
+--   PutbackOk (ModelSnapshot [("email","ab")])
 --   >>> putback [] (ModelSnapshot []) (Field (WidgetPath ["form", "x"]) "1" "count")
 --   PutbackError (FormError form/x "unknown field kind: count") (FieldResidual form/x "1" "count")
 --   >>> validateForm [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) [Field (WidgetPath ["form", "email"]) "a@b" "email"]
@@ -155,13 +159,16 @@ fieldKey (Field (WidgetPath ps) _ _) = case reverse ps of
 -- | Validate-then-apply: every field must validate (all-or-nothing);
 --   failures report every error and leave the snapshot untouched.
 --   Applied fields overwrite their model key; untouched keys persist
---   (re-validation preserves the rest of the model).
+--   (re-validation preserves the rest of the model).  The value stored
+--   under a field's key is the validator's adopted value (its 'Right'
+--   result); the raw input survives only in the field residual (a
+--   retry shows the user's actual input).
 validateForm :: Validators -> ModelSnapshot -> [Field] -> Either [FormError] ModelSnapshot
 validateForm vs (ModelSnapshot kvs) fields =
-  case [ e | f <- fields, Left e <- [validateField vs f] ] of
-    errs@(_ : _) -> Left errs
+  case [ (f, e) | f <- fields, Left e <- [validateField vs f] ] of
+    errs@(_ : _) -> Left (map snd errs)
     []           ->
-      let updates = [ (fieldKey f, fieldRaw f) | f <- fields ]
+      let updates = [ (fieldKey f, v) | f <- fields, Right v <- [validateField vs f] ]
           kept    = [ kv | kv@(k, _) <- kvs, k `notElem` map fst updates ]
       in  Right (ModelSnapshot (updates ++ kept))
 
@@ -236,18 +243,24 @@ instance Show PutbackResult where
 -- | Form putback: validate the edited field, then apply it to the
 --   snapshot by key (the validated field overwrites its model key;
 --   untouched keys persist).  A failure reports the error together
---   with the residual (the raw input a retry needs).
+--   with the residual (the raw input a retry needs).  On success the
+--   value stored is the validator's adopted value (its 'Right' result);
+--   the raw input survives only in the field residual (a retry shows
+--   the user's actual input).
 putback :: Validators -> ModelSnapshot -> Field -> PutbackResult
 putback vs snap f = case validateField vs f of
   Left e  -> PutbackError e (residualOf f)
-  Right _ -> PutbackOk (applyOne snap f)
+  Right v -> PutbackOk (applyOne snap f v)
 
--- | Apply one validated field to a snapshot by key (same ordering as
---   'validateForm': the update first, then the untouched keys).
-applyOne :: ModelSnapshot -> Field -> ModelSnapshot
-applyOne (ModelSnapshot kvs) f =
+-- | Apply one validated field, at its adopted value, to a snapshot by
+--   key (same ordering as 'validateForm': the update first, then the
+--   untouched keys).  The stored value is the validator's adopted value
+--   (its 'Right' result); the raw input survives only in the field
+--   residual (a retry shows the user's actual input).
+applyOne :: ModelSnapshot -> Field -> String -> ModelSnapshot
+applyOne (ModelSnapshot kvs) f v =
   let k    = fieldKey f
-      upd  = (k, fieldRaw f)
+      upd  = (k, v)
       kept = [ kv | kv@(k', _) <- kvs, k' /= k ]
   in  ModelSnapshot (upd : kept)
 
