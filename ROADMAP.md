@@ -180,7 +180,7 @@ Depends on: 21. Done = ① implementation ② invalidation tests. [x]
 These frameworks interpret the core. Their domain rules — validation policies, transaction semantics, ambiguity and query resolution, workflow transitions — are not derivable from `split`/`plug` and stay outside it (§0.8); they follow the closure layer in priority (§0.9).
 
 23. Establish `focal-form`: widget path, model snapshot, validation context, field residual.
-Depends on: 6, 19. Done = ① modules + docs.
+Depends on: 6, 19. Done = ① modules + docs. [x]
 
 24. Implement form putback: field edit -> validation -> `Either Error ModelDelta`.
 Depends on: 23. Done = ① implementation ② validation tests.
