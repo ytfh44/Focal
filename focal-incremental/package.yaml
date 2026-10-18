@@ -32,6 +32,23 @@ library:
   - focal-delta
 
 tests:
+  focal-incremental-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - focal-incremental
+    - focal-core
+    - focal-syntax
+    - focal-redex
+    - focal-refactor
+    - focal-delta
+    - tasty
+    - tasty-quickcheck
+    - QuickCheck
   focal-incremental-doctest:
     main:                Doctest.hs
     source-dirs:         test-doctest

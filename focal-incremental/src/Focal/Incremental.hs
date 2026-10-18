@@ -16,7 +16,15 @@
 --   is single-cell — one memo, one trace; multi-cell scheduling is out
 --   of scope.  The invalidation graph makes the reachability explicit:
 --   one edge per claimed variable, marking which claims reach the memo
---   ('InvalEdge', 'invalGraph').  No complexity claims are made: any
+--   ('InvalEdge', 'invalGraph').  The incremental plug closes the loop
+--   ('incrementalPlug'): a patch that invalidates the memo forces
+--   recomputation — v1 recomputes by applying the patch to the cached
+--   term ('recomputePatch', the computation seam; real consumers
+--   substitute their own function) — and a clean patch reads through.
+--   The output ('OutputDelta') carries its provenance, 'memoUpdate'
+--   re-keys the cache to the patch that produced the recomputed term,
+--   and 'firedEdges' reports which claimed variables reached the memo
+--   (the edges that fired).  No complexity claims are made: any
 --   cost statement would bind to a concrete persistent-tree
 --   representation, which is outside the v1 scope.
 --
@@ -43,6 +51,14 @@
 --   Just (RVar FZ)
 --   >>> memoRead (Memo PNil (RVar FZ :: Rm '[U] U)) (PCons (SomeEdit (Edit (FZ :: Fin '[U] U) RUnit)) PNil)
 --   Nothing
+--   >>> incrementalPlug recomputePatch (Memo PNil (RVar FZ :: Rm '[U] U)) (PCons (SomeEdit (Edit (FZ :: Fin '[U] U) RUnit)) PNil)
+--   Recomputed RUnit (PCons (SomeEdit (Edit FZ RUnit)) PNil)
+--   >>> incrementalPlug recomputePatch (Memo PNil (RUnit :: Rm '[] U)) PNil
+--   Clean RUnit
+--   >>> memoUpdate (Memo PNil (RVar FZ :: Rm '[U] U)) (incrementalPlug recomputePatch (Memo PNil (RVar FZ :: Rm '[U] U)) (PCons (SomeEdit (Edit (FZ :: Fin '[U] U) RUnit)) PNil))
+--   Memo (PCons (SomeEdit (Edit FZ RUnit)) PNil) RUnit
+--   >>> firedEdges (Memo PNil (RVar FZ :: Rm '[U, U] U)) (PCons (SomeEdit (Edit (FZ :: Fin '[U, U] U) RUnit)) (PCons (SomeEdit (Edit (FS FZ :: Fin '[U, U] U) RUnit)) PNil))
+--   [SomeFin FZ]
 module Focal.Incremental
   ( traceDeps
   , Memo(..)
@@ -53,11 +69,17 @@ module Focal.Incremental
   , memoRead
   , InvalEdge(..)
   , invalGraph
+  , OutputDelta(..)
+  , incrementalPlug
+  , recomputePatch
+  , memoUpdate
+  , firedEdges
+  , sameSomeFin
   ) where
 
 import Data.Maybe (mapMaybe)
 
-import Focal.Delta (Patch(..), claimed)
+import Focal.Delta (Patch(..), applyPatch, claimed)
 import Focal.Redex (Fin(..), Rm(..))
 import Focal.Refactor (SomeFin(..))
 import Focal.Syntax (Ty(..))
@@ -175,7 +197,61 @@ instance Show (InvalEdge g) where
     showParen (d > 10)
       (showString "Edge " . showsPrec 11 c . showChar ' ' . showsPrec 11 r)
 
+-- | 'Memo' takes two precedence 11 arguments.
+instance Show (Memo g t) where
+  showsPrec d (Memo p t) =
+    showParen (d > 10)
+      (showString "Memo " . showsPrec 11 p . showChar ' ' . showsPrec 11 t)
+
 -- | The invalidation graph of a memo under a patch: one edge per
 --   claimed variable, marking which claims reach the memo.
 invalGraph :: Memo g t -> Patch g -> [InvalEdge g]
 invalGraph m p = map (\c -> Edge c (memoReads m c)) (claimed p)
+
+--------------------------------------------------------------------
+-- Incremental plug
+--------------------------------------------------------------------
+
+-- | What the incremental layer outputs: the (possibly cached) result
+--   with its provenance.  'Clean' is served from the memo; 'Recomputed'
+--   carries the recomputed term together with the patch that forced it.
+data OutputDelta (g :: [Ty]) (t :: Ty)
+  = Clean (Rm g t)
+  | Recomputed (Rm g t) (Patch g)
+
+-- | 'Clean' takes one precedence 11 argument; 'Recomputed' takes two.
+instance Show (OutputDelta g t) where
+  showsPrec d (Clean t) =
+    showParen (d > 10)
+      (showString "Clean " . showsPrec 11 t)
+  showsPrec d (Recomputed t p) =
+    showParen (d > 10)
+      (showString "Recomputed " . showsPrec 11 t . showChar ' ' . showsPrec 11 p)
+
+-- | The v1 recomputation: apply the patch to the cached term (the
+--   computation seam — the caller's \"computation\" in v1 IS the patched
+--   term; real consumers substitute their own patch-to-term function
+--   for 'incrementalPlug''s first argument).
+recomputePatch :: Patch g -> Rm g t -> Rm g t
+recomputePatch p t = applyPatch p t
+
+-- | The incremental plug: run a patch against a memo.  A patch that
+--   invalidates the memo (it claims a variable the cached term reads)
+--   forces recomputation via the seam function (v1: 'recomputePatch');
+--   a clean patch reads through the cache.
+incrementalPlug :: (Patch g -> Rm g t -> Rm g t) -> Memo g t -> Patch g -> OutputDelta g t
+incrementalPlug recompute m@(Memo _ t) p
+  | invalidatedBy m p = Recomputed (recompute p t) p
+  | otherwise         = Clean t
+
+-- | Chain an output into a new memo: the recomputed term becomes the
+--   cache, keyed by the patch that produced it; a clean output leaves
+--   the memo untouched.
+memoUpdate :: Memo g t -> OutputDelta g t -> Memo g t
+memoUpdate _ (Recomputed t' p) = Memo p t'
+memoUpdate m (Clean _)         = m
+
+-- | The invalidation summary the layer reports: which claimed variables
+--   reached the memo (the edges that fired).
+firedEdges :: Memo g t -> Patch g -> [SomeFin g]
+firedEdges m p = filter (memoReads m) (claimed p)
