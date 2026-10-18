@@ -258,11 +258,11 @@ nodeAlt (Forest _ a _) = a
 
 -- | The node focus: the selected node plus its provenance-preserving
 --   context — the parent chain with the provenance of every ancestor
---   (selected node first, root last; the replacement in a refactored
+--   (root first, selected node last; the replacement in a refactored
 --   forest keeps the choice records).
 data NodeFocus = NodeFocus
   { focusNode  :: Forest
-  , focusProv  :: [Alt]        -- ^ provenance chain: selected node first, root last
+  , focusProv  :: [Alt]        -- ^ provenance chain: root first, selected node last
   }
   deriving (Eq, Show)
 
