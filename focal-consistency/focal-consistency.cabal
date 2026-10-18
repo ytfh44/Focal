@@ -5,7 +5,10 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           focal-consistency
-version:        0.1.0.0
+version:        0.2.0.0
+synopsis:       Cross-package consistency suite over the frozen law-id vocabulary
+description:    Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme> for the full documentation, the law vocabulary, and the conformance matrix.
+category:       Data
 homepage:       https://github.com/ytfh44/Focal#readme
 bug-reports:    https://github.com/ytfh44/Focal/issues
 author:         Yesod Yin

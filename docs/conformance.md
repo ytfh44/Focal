@@ -1,8 +1,9 @@
 # Focal — Conformance Matrix
 
 Per-instance verdicts against the law vocabulary in
-[`foundation.md`](foundation.md) §3, for the `focal-core-0.1.0.0` working tree
-(2026-10-16). Witnesses refer to [`../test/Spec.hs`](../test/Spec.hs).
+[`foundation.md`](foundation.md) §3, for the `focal-core-0.2.0.0` working tree
+(2026-10-18). Witnesses refer to each package's suite as named in its row;
+the root suite is [`../test/Spec.hs`](../test/Spec.hs).
 
 Legend: **✓** holds on the declared domain · **✗** fails · **cnd** conditional
 on the obligation the instance embeds · **def** holds by definition
@@ -38,6 +39,10 @@ not an instance (projection).
 | `Focal.Workflow` (`Workflow`, `Run`, `TransitionContext`, `splitRun`/`plugRun`, `Compensation`, `RollbackPlan`/`rollbackPlan`, `GateVerdict`/`validateGate`, `InvalidTransition`, `workflowPlug`) | — | — | — | — | ✓ | a labelled transition system (static structure only, no liveness claims); the rollback plan composes declared compensators in reverse run order — a preorder span, not an inverse; uncompensated transitions are reported by name; the gate accepts exactly when every step is declared and reports the FIRST offending step with its index, never silently dropping it (validate-then-apply) | `prop_wf_accept` (a declared replacement is accepted with the plugged run), `prop_wf_reject` (an undeclared replacement reports its step and transition), `prop_wf_first_bad` (the gate reports the first offending step), `prop_wf_untouched` (a rejected replacement leaves the context validating) | workflow layer over the patch layer (C5 route); suite lives in the `focal-workflow` package |
 
 Verdict footnotes:
+
+- **Released surface** — `focal-0.2` (2026-10-18): every row below is a
+  released verdict at version 0.2.0.0; each package's suite is the witness
+  set named in its row.
 
 - **✓\*** — GP holds only for the source the snapshot was built from (that is
   the tree `plugF` rebuilds). For any other source the round-trip fails; the

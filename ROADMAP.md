@@ -211,7 +211,7 @@ Depends on: 29. Done = ① implementation ② transition tests. [x]
 Depends on: 8–30. Done = ① suite runs against frozen law-ids ② every package registers its verdicts. [x]
 
 32. Publish `focal-0.2` integration release: core stable; strong specializations available; mid-strength specializations have minimal implementations; weak specializations annotated as domain frameworks.
-Depends on: 31. Done = ① release published ② README/conformance reflect the released surface ③ no claim without a witness or a registered gap.
+Depends on: 31. Done = ① release published ② README/conformance reflect the released surface ③ no claim without a witness or a registered gap. [x]
 
 ---
 

@@ -4,7 +4,7 @@ Normative classification of every law, contract, and claim in this repository.
 This file is the authority for what counts as an **axiom**; the README summarizes
 it, and [`ROADMAP.md`](../ROADMAP.md) §0 carries engineering constraints.
 
-Working tree: `focal-core-0.1.0.0` (unreleased), 2026-10-16. Code is ground truth: where
+Working tree: `focal-core-0.2.0.0` (released 2026-10-18). Code is ground truth: where
 this document and the code disagree, the code wins and this document is fixed.
 
 ## 1. Terms and hierarchy

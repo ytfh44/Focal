@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           focal-core
-version:        0.1.0.0
+version:        0.2.0.0
 synopsis:       Explicit-residual focus: lenses, zippers, and evaluation contexts unified
 description:    Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme>
 category:       Data

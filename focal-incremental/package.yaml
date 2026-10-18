@@ -1,10 +1,16 @@
 name:                focal-incremental
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "ytfh44/Focal"
 license:             BSD-3-Clause
 author:              "Yesod Yin"
 maintainer:          "ytfh44@gmail.com"
 copyright:           "2026 Yesod Yin"
+category:            Data
+
+synopsis:            "Dependency traces, memo cells, invalidation, and the incremental plug"
+description:         Please see the README on GitHub at
+                     <https://github.com/ytfh44/Focal#readme> for the full
+                     documentation, the law vocabulary, and the conformance matrix.
 
 dependencies:
 - base >= 4.16 && < 5
@@ -25,11 +31,11 @@ library:
   exposed-modules:
   - Focal.Incremental
   dependencies:
-  - focal-core
-  - focal-syntax
-  - focal-redex
-  - focal-refactor
-  - focal-delta
+  - focal-core >= 0.2 && < 0.3
+  - focal-syntax >= 0.2 && < 0.3
+  - focal-redex >= 0.2 && < 0.3
+  - focal-refactor >= 0.2 && < 0.3
+  - focal-delta >= 0.2 && < 0.3
 
 tests:
   focal-incremental-test:

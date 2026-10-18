@@ -5,7 +5,10 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           focal-parser
-version:        0.1.0.0
+version:        0.2.0.0
+synopsis:       Grammars, provenance-carrying parse forests, and the forest focus
+description:    Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme> for the full documentation, the law vocabulary, and the conformance matrix.
+category:       Data
 homepage:       https://github.com/ytfh44/Focal#readme
 bug-reports:    https://github.com/ytfh44/Focal/issues
 author:         Yesod Yin
@@ -30,8 +33,8 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.16 && <5
-    , focal-core
-    , focal-syntax
+    , focal-core ==0.2.*
+    , focal-syntax ==0.2.*
   default-language: Haskell2010
 
 test-suite focal-parser-doctest

@@ -5,7 +5,10 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           focal-incremental
-version:        0.1.0.0
+version:        0.2.0.0
+synopsis:       Dependency traces, memo cells, invalidation, and the incremental plug
+description:    Please see the README on GitHub at <https://github.com/ytfh44/Focal#readme> for the full documentation, the law vocabulary, and the conformance matrix.
+category:       Data
 homepage:       https://github.com/ytfh44/Focal#readme
 bug-reports:    https://github.com/ytfh44/Focal/issues
 author:         Yesod Yin
@@ -30,11 +33,11 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.16 && <5
-    , focal-core
-    , focal-delta
-    , focal-redex
-    , focal-refactor
-    , focal-syntax
+    , focal-core ==0.2.*
+    , focal-delta ==0.2.*
+    , focal-redex ==0.2.*
+    , focal-refactor ==0.2.*
+    , focal-syntax ==0.2.*
   default-language: Haskell2010
 
 test-suite focal-incremental-doctest

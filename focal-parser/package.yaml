@@ -1,10 +1,16 @@
 name:                focal-parser
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "ytfh44/Focal"
 license:             BSD-3-Clause
 author:              "Yesod Yin"
 maintainer:          "ytfh44@gmail.com"
 copyright:           "2026 Yesod Yin"
+category:            Data
+
+synopsis:            "Grammars, provenance-carrying parse forests, and the forest focus"
+description:         Please see the README on GitHub at
+                     <https://github.com/ytfh44/Focal#readme> for the full
+                     documentation, the law vocabulary, and the conformance matrix.
 
 dependencies:
 - base >= 4.16 && < 5
@@ -25,8 +31,8 @@ library:
   exposed-modules:
   - Focal.Parser
   dependencies:
-  - focal-core
-  - focal-syntax
+  - focal-core >= 0.2 && < 0.3
+  - focal-syntax >= 0.2 && < 0.3
 
 tests:
   focal-parser-test:

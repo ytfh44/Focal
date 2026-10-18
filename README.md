@@ -24,7 +24,7 @@ The library currently ships with a proof-of-concept set: Lens-like focusing, pos
 | Field | Value |
 |---|---|
 | **Package** | `focal-core` |
-| **Version** | `0.1.0.0` |
+| **Version** | `0.2.0.0` |
 | **License** | BSD-3-Clause |
 | **Compiler** | GHC ≥ 9.2, Haskell Stack |
 | **Dependencies** | `base >= 4.16 && < 5` |
@@ -256,13 +256,13 @@ These still fit the `split`/`plug` shape, but the residual carries *semantic pro
 
 | # | Specialization | Residual `c` | `plug` produces | Impl? |
 |---|---|---|---|---|
-| 6 | **Refactoring** | Syntax stack + layout/type/scope facts | AST edit | ❌ |
-| 7 | **Patch / Delta** | Survival/reindexing witness | `Delta s` or conflict | ❌ † |
-| 8 | **Incremental Computation** | Dependency trace + memo cells | `OutputDelta` | ❌ † |
-| 9 | **UI / Form** | Widget path + validation context | `ModelDelta` or error | ❌ † |
-| 10 | **Parser / Grammar** | Parser state + choice provenance | Parse forest | ❌ † |
+| 6 | **Refactoring** | Syntax stack + layout/type/scope facts | AST edit | ✅ `focal-refactor` |
+| 7 | **Patch / Delta** | Survival/reindexing witness | `Delta s` or conflict | ✅ `focal-delta` |
+| 8 | **Incremental Computation** | Dependency trace + memo cells | `OutputDelta` | ✅ `focal-incremental` |
+| 9 | **UI / Form** | Widget path + validation context | `ModelDelta` or error | ✅ `focal-form` |
+| 10 | **Parser / Grammar** | Parser state + choice provenance | Parse forest | ✅ `focal-parser` |
 
-*† Rows 7–10 need extended rungs (`FocusingE`/`FocusingM` or domain-specific wrappers) — not instances of `Focusing` as shipped.*
+*Rows 7–10 carry their domain failure channels as return values (`Either` reports: conflicts, invalidation, validation errors, ambiguity) rather than at the `Focusing` rung; every row's verdicts are registered in [docs/conformance.md](docs/conformance.md).*
 
 - **Refactoring Focal** (6) extends the zipper residual with layout information, scope snapshots, type facts, and span data. This is what IDE refactoring tools (extract-local, rename, case-split) need: not just "where" but "what's around it semantically." Focal's split/plug boundary captures exactly the tree-traversal and local-replacement part. The rest — alpha-equivalence, substitution, binder-sensitive equality — lives *outside* Focal in a language-semantics layer.
 
@@ -276,22 +276,27 @@ These still fit the `split`/`plug` shape, but the residual carries *semantic pro
 
 These still satisfy the split/plug contract, but the residual becomes dominated by domain semantics rather than Focal's structural decomposition. They are useful patterns, but calling them "Focal specializations" rather than "domain frameworks that happen to use Focal" becomes debatable.
 
-| # | Specialization | Residual `c` | `plug` produces |
-|---|---|---|---|
-| 11 | **Query / Relational** † | Projection provenance + join witnesses | `RelDelta` or `AmbiguousPutback` |
-| 12 | **Workflow / State-Machine** † | Transition context + rollback plan | Workflow or `InvalidTransition` |
+| # | Specialization | Residual `c` | `plug` produces | Impl? |
+|---|---|---|---|---|
+| 11 | **Query / Relational** | Projection provenance + join witnesses | `RelDelta` or `AmbiguousPutback` | ✅ `focal-query` |
+| 12 | **Workflow / State-Machine** | Transition context + rollback plan | Workflow or `InvalidTransition` | ✅ `focal-workflow` |
 
-*† Rows 11–12 need extended rungs — see [docs/foundation.md](docs/foundation.md) §1.*
+*Rows 11–12 ship as annotated domain frameworks ([docs/foundation.md](docs/foundation.md) §1): v1 keeps the minimal implementations above, and their domain rules — view-update policy, transition semantics — stay outside the core (§0.8).*
 
-- **Query Focal** (11) is adjacent to Persistence Focal but operates at the relational algebra level (materialized views, BI dashboards). The hard problem is not decomposition but *putback policy* — when a user edits a projection, which base relations should change? This is the view-update problem from bidirectional transformation research.
+- **Query Focal** (11) is adjacent to Persistence Focal but operates at the relational algebra level (materialized views, BI dashboards). The hard problem is not decomposition but *putback policy* — when a user edits a projection, which base relations should change? This is the view-update problem from bidirectional transformation research. It ships in the `focal-query` package (v1: policy-ordered `relPutback`, ambiguity reported, never silently resolved).
 
-- **Workflow Focal** (12) treats a long-running process as a focusable structure: the current task is the focus, the surrounding workflow state is the residual, and `plug` checks transition validity. It is not a Monad replacement — Monad sequences effects; Focal locates the current task within the workflow's spatial/topological structure.
+- **Workflow Focal** (12) treats a long-running process as a focusable structure: the current task is the focus, the surrounding workflow state is the residual, and `plug` checks transition validity. It is not a Monad replacement — Monad sequences effects; Focal locates the current task within the workflow's spatial/topological structure. It ships in the `focal-workflow` package (v1: static transition validation and rollback plans; no liveness claims).
 
 ---
 
 ## Why these four and not the other eight?
 
-The library implements ~3.5 of the 12 specializations. The choice is not arbitrary — it follows a deliberate boundary:
+The **core** implements the four strong specializations as laws; the other
+eight ship as separate packages — rows 6–10 with minimal implementations
+(`focal-refactor`, `focal-delta`, `focal-incremental`, `focal-form`,
+`focal-parser`), rows 11–12 annotated as domain frameworks
+(`focal-query`, `focal-workflow`). The choice is not arbitrary — it
+follows a deliberate boundary:
 
 ### What's in scope for the core library
 

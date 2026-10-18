@@ -8,6 +8,47 @@ and this project adheres to the
 
 ## Unreleased
 
+## 0.2.0.0 - 2026-10-18
+
+Integration release: ten packages over the stable core, all twelve
+specializations implemented (rows 11–12 annotated as domain frameworks).
+
+- Added `focal-syntax` (0.2.0.0): the sort-indexed example language with
+  the typed contexts (`Stack i j`), the canonical sort-checked split, the
+  law witnesses, and the negative type-error witness.
+- Added `focal-redex` (0.2.0.0): the typed de Bruijn core (values, redexes,
+  evaluation contexts, substitution), the canonical decomposition with the
+  optional-rung redex focus, and the law family (plug-after-decompose,
+  progress, normalization, head step = beta).
+- Added `focal-refactor` (0.2.0.0): the top-down refactor stack with type
+  facts, scope snapshots, and layout spans; capture-avoiding substitution
+  and path transport with the substitution-commutes-with-path lemma; the
+  basic operations (rename, abstract, inline, eta-expansion).
+- Added `focal-delta` (0.2.0.0): evidence-carrying edits, patches, and the
+  zero-/two-candidate conflict reports; the structural patch focus and the
+  refactoring bridge (rename and inline as edits).
+- Added `focal-incremental` (0.2.0.0): dependency traces, the single-cell
+  memo, invalidation over claimed-vs-read sets, and the incremental plug
+  with `OutputDelta`.
+- Added `focal-form` (0.2.0.0): widget paths, the validation registry,
+  model snapshots, and field residuals with provenance; the
+  validate-then-apply putback.
+- Added `focal-parser` (0.2.0.0): grammars with named alternatives,
+  provenance-carrying forests, the selection focus with the frame-list
+  (non-tree) residual, and the reparse report (ambiguity preserved, never
+  resolved).
+- Added `focal-query` (0.2.0.0): tables, projection provenance, join
+  witnesses, view-update policies, and the policy-ordered relational
+  putback (`AmbiguousPutback`, never a silent choice).
+- Added `focal-workflow` (0.2.0.0): transition contexts, rollback plans
+  (compensation as a preorder), the validation gate, and the workflow plug.
+- Added `focal-consistency` (test-only): the cross-package consistency
+  suite over the frozen law-id vocabulary (23 properties, all ten
+  packages).
+- Documentation: `docs/foundation.md` §1/§3, the conformance matrix, the
+  README specialization tables, and the roadmap reflect the released
+  surface. No `focal-core` API changes in this release.
+
 ## 0.1.0.0 - 2026-10-16
 
 - Documentation layer revision: added `docs/foundation.md` (axiom A-LENS, L0–L6
