@@ -75,10 +75,11 @@ plus the doctest suite):
   regressions (decompose/plug/step plus the `redexF` rung trio) and 4 laws
   (plug-after-decompose, progress, normalization, head step = beta);
   registered per package; the root total stays 136.
-- **Refactoring layer (focal-refactor suite): 4 properties** (`prop_rf_*`) —
+- **Refactoring layer (focal-refactor suite): 9 properties** (`prop_rf_*`) —
   substitution identity, hit/non-hit equations, no-capture under a fresh
-  binder, and substitution-commutes-with-path; registered per package; the
-  root total stays 136.
+  binder, substitution-commutes-with-path, the rename involution, the
+  abstract-then-apply round trips, and the operation round trips
+  (eta-expansion, inline); registered per package; the root total stays 136.
 - **Patch layer (focal-delta suite): 7 properties** (`prop_dl_*`) — patch-focus
   hits with evidence preservation, the zero-candidate equation,
   substitution-commutes-with-weakening, evidence travel, and the
