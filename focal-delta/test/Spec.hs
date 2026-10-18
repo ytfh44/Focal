@@ -4,18 +4,18 @@
 
 module Main (main) where
 
-import Test.QuickCheck (Gen, Property, conjoin, forAll, oneof, property, sized)
+import Test.QuickCheck (Gen, Property, conjoin, forAll, oneof, property, sized, (=/=), (==>))
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.QuickCheck (testProperty, (===))
 
 import Focal.Syntax (Ty(..), TyRep(..), eqRep)
-import Focal.Redex (Fin(..), Rm(..))
+import Focal.Redex (Fin(..), Rm(..), Redex(..), contract, lift1)
 import Focal.Refactor
-  ( RCtx(..), occursAt, substitute, weakenFin, weakenRm
+  ( RCtx(..), occursAt, rename, substitute, weakenFin, weakenRm
   )
 import Focal.Delta
-  ( Conflict(..), Delta(..), Edit(..), deltaOn, patchFocus, reindexDelta
-  , samePos, survives
+  ( Conflict(..), Delta(..), Edit(..), applyEdit, deltaOn, inlineApply
+  , patchFocus, reindexDelta, renameEdit, samePos, survives
   )
 
 main :: IO ()
@@ -32,6 +32,14 @@ tests = testGroup "focal-delta — structural patch focus"
           prop_dl_reindex
       , testProperty "evidence travels to other terms"
           prop_dl_delta_on
+      ]
+  , testGroup "Refactoring bridge"
+      [ testProperty "rename through the edit layer reproduces the operation (fresh target)"
+          prop_dl_rename_bridge
+      , testProperty "renaming to an occupied target is not the one-point edit"
+          prop_dl_rename_swap
+      , testProperty "inlining through the edit layer is lifted beta contraction"
+          prop_dl_inline_bridge
       ]
   ]
 
@@ -108,6 +116,51 @@ prop_dl_delta_on = forAll genBodyU1 $ \t1 -> forAll genBodyU1 $ \t2 ->
       Right (Delta _ t') -> t' === substitute (FZ :: Fin '[U] U) (RVar FZ) t2
 
 --------------------------------------------------------------------
+-- Refactoring bridge
+--------------------------------------------------------------------
+
+-- | The rename bridge: applying the rename's edit reproduces the rename
+--   operation when the target position is fresh (not occurring in the
+--   term).  The non-vacuous concrete leg pins a variable-only term; the
+--   generator leg carries the freshness premise (under a binder the
+--   fresh position is the binder's own variable, which "Focal.Refactor"'s
+--   'substitute' never touches and 'rename' transposes only when both
+--   positions are used).
+prop_dl_rename_bridge :: Property
+prop_dl_rename_bridge = conjoin
+  [ applyEdit (renameEdit (FZ :: Fin '[U, U] U) (FS FZ)) (RVar FZ)
+      === rename (FZ :: Fin '[U, U] U) (FS FZ) (RVar FZ)
+  , forAll genBodyU2 $ \t ->
+      not (occursAt (FS FZ :: Fin '[U, U] U) t) ==>
+        applyEdit (renameEdit (FZ :: Fin '[U, U] U) (FS FZ)) t
+          === rename (FZ :: Fin '[U, U] U) (FS FZ) t
+  ]
+
+-- | Renaming to an occupied target transposes: the positions swap
+--   roles, so the one-point edit and the operation differ (witnessed on
+--   a term using both positions).
+prop_dl_rename_swap :: Property
+prop_dl_rename_swap =
+  applyEdit (renameEdit (FZ :: Fin '[U, U] U) (FS FZ))
+    (RVar (FS FZ) :: Rm '[U, U] U)
+    =/= rename (FZ :: Fin '[U, U] U) (FS FZ)
+      (RVar (FS FZ) :: Rm '[U, U] U)
+
+-- | Inlining through the edit layer is lifted beta contraction: the
+--   edit applies "Focal.Refactor"'s binder-aware substitution
+--   ('applyEdit', i.e. 'substitute') in the extended context, keeping
+--   the binder's slot; "Focal.Redex"'s 'contract' drops the slot —
+--   relating the two is exactly 'lift1' (the
+--   substitution-commutes-with-weakening cross-layer witness).
+prop_dl_inline_bridge :: Property
+prop_dl_inline_bridge = conjoin
+  [ inlineApply (RVar FZ :: Rm '[U] U) (RVar FZ :: Rm '[U, U] U) === RVar (FS FZ)
+  , forAll genBodyU2 $ \b ->
+      inlineApply (RVar FZ :: Rm '[U] U) b
+        === lift1 (contract (Beta TyRepU b (RVar FZ :: Rm '[U] U)))
+  ]
+
+--------------------------------------------------------------------
 -- Generators — terms over '[U] and '[U, U] at the two fixed sorts
 --------------------------------------------------------------------
 
@@ -152,3 +205,7 @@ genBodyU2N n = oneof
   , pure (RVar (FS FZ))
   , RApp (RLam TyRepU (RVar FZ)) <$> genBodyU2N (n `div` 2)
   ]
+
+-- Wrapper for the refactoring-bridge properties.
+genBodyU2 :: Gen (Rm '[U, U] U)
+genBodyU2 = sized genBodyU2N

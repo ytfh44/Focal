@@ -22,6 +22,15 @@
 --   otherwise ('patchFocus' — the 'Either' is the patch layer's failure
 --   channel).
 --
+--   The refactoring bridge reports the operations of "Focal.Refactor"
+--   as evidence-carrying edits: a rename is a one-point edit — exactly
+--   the operation when the target position is fresh ('renameEdit' /
+--   'renamePatchFocus') — and an inlining is the innermost-variable
+--   substitution ('inlineEdit' / 'inlineApply').  The transposition
+--   side of a rename to an occupied target, and the deletion of the
+--   inlined application, are structural and stay outside the edit
+--   layer.
+--
 --   >>> :set -XDataKinds -XTypeOperators
 --   >>> import Focal.Redex
 --   >>> import Focal.Refactor
@@ -72,9 +81,13 @@ module Focal.Delta
   , countOccurrences
   , reindexDelta
   , deltaOn
+  , renameEdit
+  , renamePatchFocus
+  , inlineEdit
+  , inlineApply
   ) where
 
-import Focal.Redex (Fin(..), Rm(..))
+import Focal.Redex (Fin(..), Rm(..), lift1)
 import Focal.Refactor
   ( RCtx(..)
   , SomeFin(..)
@@ -304,3 +317,54 @@ reindexDelta k (Delta e t) = Delta (reindexEdit k e) (weakenRm k t)
 --   zero-candidate conflict can arise at the new site.
 deltaOn :: Delta g t -> Rm g t' -> Either (Conflict g) (Delta g t')
 deltaOn (Delta e _) = patchFocus e
+
+--------------------------------------------------------------------
+-- Refactoring bridge
+--------------------------------------------------------------------
+
+-- | The edit a rename performs: occurrences of @i@ become @j@.  A
+--   rename is a transposition (@i@ and @j@ swap roles), so this one-point
+--   edit is exactly the operation only when @j@ does not occur in the
+--   renamed term — otherwise the transposition side, which a one-point
+--   edit cannot express, is structural and stays outside the edit layer.
+renameEdit :: Fin g s -> Fin g s -> Edit g s
+renameEdit i j = Edit i (RVar j)
+
+-- | Rename through the patch focus: the global delta of the renaming
+--   when the renamed variable occurs, the zero-candidate conflict
+--   otherwise.
+--
+--   >>> :set -XDataKinds -XTypeOperators
+--   >>> import Focal.Redex
+--   >>> import Focal.Syntax
+--   >>> renamePatchFocus (FZ :: Fin '[U, U] U) (FS FZ) (RVar FZ :: Rm '[U, U] U)
+--   Right (Delta (Edit FZ (RVar (FS FZ))) (RVar (FS FZ)))
+--   >>> renamePatchFocus (FZ :: Fin '[U] U) FZ (RUnit :: Rm '[U] U)
+--   Left (NoSite FZ)
+renamePatchFocus :: Fin g s -> Fin g s -> Rm g t -> Either (Conflict g) (Delta g t)
+renamePatchFocus i j = patchFocus (renameEdit i j)
+
+-- | The substitution an inlining performs: the bound variable of the
+--   redex body's context (the innermost position) replaced by the
+--   argument, weakened past the binder's own slot.  Deleting the
+--   application is structural and stays outside the edit.
+inlineEdit :: Rm g s -> Edit (s ': g) s
+inlineEdit a = Edit FZ (lift1 a)
+
+-- | Apply an inline edit to a redex body: the argument (weakened)
+--   replaces the bound variable; the binder's context slot is kept, so
+--   the result still lives in the extended context with a vacuous head
+--   slot.  Beta contraction proper — the slot dropped, as in
+--   "Focal.Redex"'s @subst1@ — is one 'lift1' away and outside the edit
+--   layer, whose application ('applyEdit', i.e. substitution) never
+--   drops context.
+--
+--   >>> :set -XDataKinds -XTypeOperators
+--   >>> import Focal.Redex
+--   >>> import Focal.Syntax
+--   >>> inlineApply (RUnit :: Rm '[U] U) (RVar FZ :: Rm '[U, U] U)
+--   RUnit
+--   >>> inlineEdit (RUnit :: Rm '[U] U)
+--   Edit FZ RUnit
+inlineApply :: Rm g s -> Rm (s ': g) t -> Rm (s ': g) t
+inlineApply a body = applyEdit (inlineEdit a) body

@@ -165,7 +165,7 @@ Depends on: 8. Done = ① modules + docs ② law-ids registered if claimed. [x]
 Depends on: 18. Done = ① implementation ② conflict tests. [x]
 
 20. Connect refactoring to delta: refactoring operations output patches, not just new ASTs.
-Depends on: 17, 19. Done = ① integration ② patch round-trip tests.
+Depends on: 17, 19. Done = ① integration ② patch round-trip tests. [x]
 
 21. Establish `focal-incremental`: dependency trace, memo cell, invalidation graph.
 Depends on: 19. Done = ① modules + docs.
