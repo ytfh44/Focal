@@ -28,7 +28,12 @@ this document and the code disagree, the code wins and this document is fixed.
   rung's fixed focus sort. The refactoring layer ('Focal.Refactor') builds
   on the de Bruijn core: a top-down one-hole stack ('RCtx') addresses
   positions, and sort facts, scope snapshots, and layout spans are carried
-  as facts alongside it.
+  as facts alongside it. The domain layers build on the same core with the
+  same failure-channel discipline: the patch layer ('Focal.Delta') reports
+  zero- and two-candidate conflicts, the incremental layer
+  ('Focal.Incremental') drives invalidation from claimed-vs-read variables,
+  and the form layer ('Focal.Form') gates edits with validate-then-apply
+  (error provenance is the widget path, carried by the field residual).
 - **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
   validation, logging, and state live in the monad `m`; `FocusingE` is the
   `m = Either e` case, and a pure `Focusing` embeds by purity.

@@ -57,3 +57,26 @@ test-suite focal-form-doctest
     , focal-refactor
     , focal-syntax
   default-language: Haskell2010
+
+test-suite focal-form-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_focal_form
+  autogen-modules:
+      Paths_focal_form
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , base >=4.16 && <5
+    , focal-core
+    , focal-delta
+    , focal-form
+    , focal-redex
+    , focal-refactor
+    , focal-syntax
+    , tasty
+    , tasty-quickcheck
+  default-language: Haskell2010

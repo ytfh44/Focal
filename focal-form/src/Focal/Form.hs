@@ -32,6 +32,12 @@
 --   Left (FormError f/x "unknown field kind: phone")
 --   >>> revalidate (residualOf (Field (WidgetPath ["form", "email"]) "" "email")) [("email", nonEmpty)]
 --   Left (FormError form/email "empty")
+--   >>> putback [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) (Field (WidgetPath ["form", "email"]) "a@b" "email")
+--   PutbackOk (ModelSnapshot [("email","a@b"),("user","u")])
+--   >>> putback [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) (Field (WidgetPath ["form", "email"]) "" "email")
+--   PutbackError (FormError form/email "empty") (FieldResidual form/email "" "email")
+--   >>> putback [] (ModelSnapshot []) (Field (WidgetPath ["form", "x"]) "1" "count")
+--   PutbackError (FormError form/x "unknown field kind: count") (FieldResidual form/x "1" "count")
 --   >>> validateForm [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) [Field (WidgetPath ["form", "email"]) "a@b" "email"]
 --   Right (ModelSnapshot [("email","a@b"),("user","u")])
 --   >>> validateForm [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) [Field (WidgetPath ["form", "email"]) "" "email", Field (WidgetPath ["form", "name"]) "n" "nonempty"]
@@ -51,6 +57,9 @@ module Focal.Form
   , fieldKey
   , residuals
   , nonEmpty
+  , PutbackResult(..)
+  , putback
+  , applyOne
   ) where
 
 import Data.List (intercalate)
@@ -197,6 +206,50 @@ residuals vs fields = [ residualOf f | f <- fields, isFailure f ]
     isFailure f = case validateField vs f of
       Left _  -> True
       Right _ -> False
+
+--------------------------------------------------------------------
+-- Form putback
+--------------------------------------------------------------------
+
+-- | The putback result: either the validation error (with the failed
+--   input's residual) or the updated snapshot (the model delta).
+data PutbackResult
+  = PutbackError FormError FieldResidual
+  | PutbackOk ModelSnapshot
+
+-- | Structural equality of putback results (needed by the suite's
+--   concrete equations; mirrors the siblings' derived instances).
+instance Eq PutbackResult where
+  PutbackError e1 r1 == PutbackError e2 r2 = e1 == e2 && r1 == r2
+  PutbackOk m1       == PutbackOk m2       = m1 == m2
+  _                  == _                  = False
+
+-- | Show for 'PutbackResult': unquoted style as the siblings.
+instance Show PutbackResult where
+  showsPrec d (PutbackError e r) =
+    showParen (d > 10)
+      (showString "PutbackError " . showsPrec 11 e . showChar ' ' . showsPrec 11 r)
+  showsPrec d (PutbackOk m) =
+    showParen (d > 10)
+      (showString "PutbackOk " . showsPrec 11 m)
+
+-- | Form putback: validate the edited field, then apply it to the
+--   snapshot by key (the validated field overwrites its model key;
+--   untouched keys persist).  A failure reports the error together
+--   with the residual (the raw input a retry needs).
+putback :: Validators -> ModelSnapshot -> Field -> PutbackResult
+putback vs snap f = case validateField vs f of
+  Left e  -> PutbackError e (residualOf f)
+  Right _ -> PutbackOk (applyOne snap f)
+
+-- | Apply one validated field to a snapshot by key (same ordering as
+--   'validateForm': the update first, then the untouched keys).
+applyOne :: ModelSnapshot -> Field -> ModelSnapshot
+applyOne (ModelSnapshot kvs) f =
+  let k    = fieldKey f
+      upd  = (k, fieldRaw f)
+      kept = [ kv | kv@(k', _) <- kvs, k' /= k ]
+  in  ModelSnapshot (upd : kept)
 
 --------------------------------------------------------------------
 -- The example validator

@@ -183,7 +183,7 @@ These frameworks interpret the core. Their domain rules — validation policies,
 Depends on: 6, 19. Done = ① modules + docs. [x]
 
 24. Implement form putback: field edit -> validation -> `Either Error ModelDelta`.
-Depends on: 23. Done = ① implementation ② validation tests.
+Depends on: 23. Done = ① implementation ② validation tests. [x]
 
 25. Establish `focal-parser`: parser state, grammar choice provenance, parse forest node focus.
 Depends on: 6, 10, 19. Done = ① modules + docs.
