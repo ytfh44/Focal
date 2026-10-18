@@ -12,8 +12,8 @@ import Test.Tasty.QuickCheck (testProperty, (===))
 import Focal.Syntax (Ty(..), TyRep(..))
 import Focal.Redex (Fin(..), Rm(..))
 import Focal.Refactor
-  ( RCtx(..), abstract, etaExpand, frameOccurs, inlineAt, plugRCtx, rename, substitute
-  , weakenFin, weakenRm
+  ( RCtx(..), Span(..), Spanned(..), abstract, etaExpand, frameOccurs, inlineAt
+  , plugRCtx, rename, renderSpans, substitute, weakenFin, weakenRm
   )
 
 main :: IO ()
@@ -35,6 +35,9 @@ tests = testGroup "focal-refactor — binder-aware replacement"
           prop_rf_abstract_var
       , testProperty "eta expansion inlines back" prop_rf_eta_roundtrip
       , testProperty "inlineAt contracts a root redex" prop_rf_inline_hits
+      ]
+  , testGroup "Rendered spans"
+      [ testProperty "spans carry global text offsets" prop_rf_spans_global
       ]
   ]
 
@@ -114,6 +117,29 @@ prop_rf_inline_hits = conjoin
   , inlineAt (RUnit :: Rm '[] U) === Nothing
   , inlineAt (RLam TyRepU RUnit :: Rm '[] (U :-> U)) === Nothing
   ]
+
+-- 'renderSpans' spans are GLOBAL: each node's span is its extent in the
+-- flat rendering, not an offset local to its subtree.  The fixture
+-- @((\\. unit) unit)@ is 16 characters; the lambda sits at @[1, 10)@
+-- with its body at @[5, 9)@, and the argument at @[11, 15)@.
+-- ('Spanned' has no 'Eq' instance, so the pin compares each node's
+-- rendered path together with its span.)
+prop_rf_spans_global :: Property
+prop_rf_spans_global =
+  let (txt, nodes) =
+        renderSpans (RApp (RLam TyRepU RUnit) RUnit :: Rm '[] U)
+  in  (txt, map spanView nodes)
+        === ( "((\\. unit) unit)"
+            , [ ("RHole", Span 0 16)
+              , ("RAppL RUnit RHole", Span 1 10)
+              , ("RLamC TyRepU (RAppL RUnit RHole)", Span 5 9)
+              , ("RAppR (RLam TyRepU RUnit) RHole", Span 11 15)
+              ]
+            )
+
+-- A node's rendered path paired with its span.
+spanView :: Spanned g t -> (String, Span)
+spanView (Spanned k sp) = (show k, sp)
 
 --------------------------------------------------------------------
 -- Generators

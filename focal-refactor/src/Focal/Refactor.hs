@@ -11,10 +11,10 @@
 --   position-addressed edits; 'TyCtx' + 'rmRepOf' recover sort facts at
 --   any node; scope snapshots collect a subterm's free variables; the
 --   flat renderer assigns every node a text 'Span' keyed by its path.
---   In a de Bruijn encoding alpha-renaming is positional (indices name
---   binders), so the load-bearing replacement operations are
---   capture-avoiding substitution ('substitute') and scope-preserving
---   transport ('weakenFin' / 'weakenRm').
+--   Binder names are not represented in this form, so alpha-renaming
+--   itself is vacuous; the load-bearing operations are capture-avoiding
+--   substitution ('substitute'), positional transport ('weakenFin' /
+--   'weakenRm'), and the transposition operator ('rename').
 --
 --   >>> :set -XDataKinds -XTypeOperators
 --   >>> import Focal.Redex
@@ -35,6 +35,8 @@
 --   []
 --   >>> renderSpans (RUnit :: Rm '[] U)
 --   ("unit",[Spanned RHole (Span 0 4)])
+--   >>> renderSpans (RLam TyRepU RUnit :: Rm '[] (U :-> U))
+--   ("(\\. unit)",[Spanned RHole (Span 0 9),Spanned (RLamC TyRepU RHole) (Span 4 8)])
 --   >>> snapRep (snapshot TxCNil RHole (RLam TyRepU (RVar FZ)))
 --   TyRepArr TyRepU TyRepU
 --   >>> substitute (FZ :: Fin '[U, U] U) (RVar (FS FZ)) (RVar FZ :: Rm '[U, U] U)
@@ -224,26 +226,26 @@ instance Show (Spanned g t) where
     showParen (d > 10)
       (showString "Spanned " . showsPrec 11 k . showChar ' ' . showsPrec 11 sp)
 
--- | Render the term and report every node's path and text span.
+-- | Render the term and report every node's path and (global) text span.
 renderSpans :: forall g t. Rm g t -> (String, [Spanned g t])
-renderSpans = go RHole
+renderSpans t = go 0 RHole t
   where
-    go :: forall h s. RCtx g h s t -> Rm h s -> (String, [Spanned g t])
-    go k RUnit = ("unit", [Spanned k (Span 0 4)])
-    go k (RVar i) =
+    go :: forall h s. Int -> RCtx g h s t -> Rm h s -> (String, [Spanned g t])
+    go off k RUnit = ("unit", [Spanned k (Span off (off + 4))])
+    go off k (RVar i) =
       let str = varName i
-      in  (str, [Spanned k (Span 0 (length str))])
-    go k (RLam r b) =
-      let (bs, xs) = go (RLamC r k) b
+      in  (str, [Spanned k (Span off (off + length str))])
+    go off k (RLam r b) =
+      let (bs, xs) = go (off + 4) (RLamC r k) b
           whole    = "(\\. " ++ bs ++ ")"
       in  ( whole
-          , Spanned k (Span 0 (length whole)) : xs )
-    go k (RApp f x) =
-      let (fs, xs)  = go (RAppL x k) f
-          (xs', ys) = go (RAppR f k) x
+          , Spanned k (Span off (off + length whole)) : xs )
+    go off k (RApp f x) =
+      let (fs, xs)  = go (off + 1) (RAppL x k) f
+          (xs', ys) = go (off + 1 + length fs + 1) (RAppR f k) x
           whole     = "(" ++ fs ++ " " ++ xs' ++ ")"
       in  ( whole
-          , Spanned k (Span 0 (length whole)) : xs ++ ys )
+          , Spanned k (Span off (off + length whole)) : xs ++ ys )
 
 -- | Scope snapshot: a focused subterm with its path, its free
 --   variables, and its sort fact.
@@ -326,14 +328,16 @@ frameOccurs (RLamC _ k) (FS i) = frameOccurs k i
 -- Basic refactoring operations
 --------------------------------------------------------------------
 
--- | Alpha-rename by transposition: swap the roles of two variable
---   positions.  An involution — renaming twice with the same pair is
---   the identity, which the round-trip property witnesses.
+-- | Variable transposition: swap the roles of two positions.  An
+--   involution - transposing twice with the same pair is the identity,
+--   which the round-trip property witnesses.
 --
---   In a de Bruijn encoding this IS alpha-renaming: indices name
---   binders, so moving an index is the whole operation.  The operation
---   is total on any pair of positions; a target position the term does
---   not otherwise use is simply a fresh name.
+--   This is a positional renaming, not alpha-renaming in the usual
+--   sense: swapping two de Bruijn positions changes which binder an
+--   occurrence resolves to, so the term's meaning moves with it.  (In de
+--   Bruijn form alpha-renaming itself is vacuous - binder names are not
+--   represented.)  The operation is total on any pair of positions; a
+--   target position the term does not otherwise use is a fresh name.
 --
 --   >>> rename (FS FZ :: Fin '[U, U] U) FZ (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ)) :: Rm '[U, U] U)
 --   RApp (RLam TyRepU (RVar FZ)) (RVar FZ)
