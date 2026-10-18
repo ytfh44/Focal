@@ -17,6 +17,8 @@ import Focal.Parser
   , focusAt
   , focusForest
   , nodeAlt
+  , parse
+  , parseAll
   , plugForest
   , reparseReport
   , select
@@ -32,6 +34,8 @@ tests = testGroup "focal-parser — grammar focus"
       , testProperty "the residual's selection re-selects the replaced node" prop_ps_selection_preserved
       , testProperty "ancestor provenance survives replacement" prop_ps_provenance_preserved
       , testProperty "the reparse report lists the kind's other alternatives" prop_ps_reparse_report
+      , testProperty "the multi-derivation case enumerates both alternatives" prop_ps_ambiguity_multi
+      , testProperty "a nullable derivation is dropped, not looped" prop_ps_nullable_divergence
       ]
   ]
 
@@ -103,14 +107,58 @@ prop_ps_provenance_preserved =
               ]
 
 -- | The reparse report computes the induced parse-set change: the
---   grammar's alternatives for the replaced node's kind minus the one
---   its provenance claims (listed, never resolved), and nothing for an
---   unknown kind.
+--   replaced node's LOCAL structural admission (its kind must declare
+--   the production its provenance names, with symbols matching the
+--   children) plus the grammar's other alternatives for that kind
+--   (listed, never resolved), and nothing for an unknown kind.
 prop_ps_reparse_report :: Property
 prop_ps_reparse_report = conjoin
   [ reparseReport [("p", [("pair", []), ("solo", [])])] (Forest "p" (Alt "pair") [])
-      === ReparseReport "p" (Alt "pair") ["solo"]
-  , reparseReport gP fP === ReparseReport "p" (Alt "pair") []
+      === ReparseReport "p" (Alt "pair") True ["solo"]
+  , reparseReport gP fP === ReparseReport "p" (Alt "pair") True []
+  , reparseReport gP (Forest "n" (Alt "lit") [])
+      === ReparseReport "n" (Alt "lit") False []
   , reparseReport gP (Forest "q" (Alt "lit") [])
-      === ReparseReport "q" (Alt "lit") []
+      === ReparseReport "q" (Alt "lit") False []
   ]
+
+-- | The multi-derivation case is REAL, not merely reported statically:
+--   a kind whose two alternatives match the SAME input has BOTH
+--   derivations enumerated by 'parseAll' (in grammar order), while the
+--   deterministic 'parse' takes the first alternative; the reparse
+--   report of such a node admits it and lists the competing
+--   alternative — enumerated and reported, never silently resolved.
+prop_ps_ambiguity_multi :: Property
+prop_ps_ambiguity_multi = conjoin
+  [ length fsA === 2
+  , map nodeAlt fsA === [Alt "a", Alt "b"]
+  , fmap (nodeAlt . fst) (parse gA ["x"] "e") === Just (Alt "a")
+  , reparseReport gA (Forest "e" (Alt "a") [Forest "x" (Alt "x") []])
+      === ReparseReport "e" (Alt "a") True ["b"]
+  , reparseReport gA (Forest "e" (Alt "b") [Forest "x" (Alt "x") []])
+      === ReparseReport "e" (Alt "b") True ["a"]
+  ]
+  where
+    -- The ambiguous grammar: two alternatives, both consuming "x".
+    gA :: Grammar
+    gA = [("e", [("a", [Term "x"]), ("b", [Term "x"])])]
+    -- Every completed derivation of "e" over the input ["x"].
+    fsA :: [Forest]
+    fsA = parseAll gA ["x"] "e"
+
+-- | The documented precondition, witnessed explicitly: 'ge' has a
+--   nullable nonterminal ("e" derives the empty sequence), so the
+--   zero-consumption prune drops that derivation — 'parse' admits the
+--   input through it, while 'parseAll' returns no result at all.  This
+--   is exactly the divergence the 'parseAll' haddock states.
+prop_ps_nullable_divergence :: Property
+prop_ps_nullable_divergence = conjoin
+  [ fmap fst (parse ge ["x"] "q")
+      === Just (Forest "q" (Alt "two")
+                  [Forest "e" (Alt "empty") [], Forest "x" (Alt "x") []])
+  , parseAll ge ["x"] "q" === []
+  ]
+  where
+    -- The nullable grammar: "e" derives nothing; "q" is "e" then "x".
+    ge :: Grammar
+    ge = [("e", [("empty", [])]), ("q", [("two", [NonTerm "e", Term "x"])])]

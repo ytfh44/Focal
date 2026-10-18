@@ -34,8 +34,11 @@
 --   re-selects the replaced node.  A replacement also induces a
 --   parse-set change — for the replaced node's kind, the grammar's
 --   alternatives minus the one the node's provenance claims — which
---   'reparseReport' COMPUTES and REPORTS, never resolves: ambiguity
---   preservation is the report, not a choice.
+--   'reparseReport' COMPUTES and REPORTS, never resolves: it also
+--   evaluates the node's own LOCAL structural admission ('admits' —
+--   does the node's kind derive it from these children?), so the
+--   outcome is decisive on the node, not merely a list of alternatives.
+--   Ambiguity preservation is the report, not a choice.
 --
 --   >>> import Focal.Parser
 --   >>> let g = [("n", [("lit", [Term "x"])]), ("p", [("pair", [NonTerm "n", NonTerm "n"])])]
@@ -76,11 +79,20 @@
 --   >>> fmap (\ff -> select (residualSel (focusResidual ff)) (plugForest (focusResidual ff) (Forest "z" (Alt "zz") []))) (focusForest (Selection [1]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [],Forest "m" (Alt "lit2") []]))
 --   Just (Just (Forest "z" (Alt "zz") []))
 --   >>> reparseReport [("p", [("pair", []), ("solo", [])])] (Forest "p" (Alt "pair") [])
---   ReparseReport "p" (Alt "pair") ["solo"]
+--   ReparseReport "p" (Alt "pair") True ["solo"]
 --   >>> reparseReport [("p", [("pair", [])])] (Forest "p" (Alt "pair") [])
---   ReparseReport "p" (Alt "pair") []
+--   ReparseReport "p" (Alt "pair") True []
 --   >>> fmap focusResidual (focusForest (Selection [5]) (Forest "p" (Alt "pair") []))
 --   Nothing
+--   >>> admits [("n", [("lit", [Term "x"])])] (Forest "n" (Alt "lit") [])
+--   False
+--   >>> admits [("n", [("lit", [Term "x"])])] (Forest "n" (Alt "lit") [Forest "x" (Alt "x") []])
+--   True
+--   >>> let ge = [("e", [("empty", [])]), ("q", [("two", [NonTerm "e", Term "x"])])]
+--   >>> fmap fst (parse ge ["x"] "q")
+--   Just (Forest "q" (Alt "two") [Forest "e" (Alt "empty") [],Forest "x" (Alt "x") []])
+--   >>> parseAll ge ["x"] "q"
+--   []
 module Focal.Parser
   ( Alt(..)
   , Sym(..)
@@ -108,6 +120,7 @@ module Focal.Parser
   , ForestFocus(..)
   , focusForest
   , plugForest
+  , admits
   , ReparseReport(..)
   , reparseReport
   ) where
@@ -275,12 +288,18 @@ replaceAt (Selection (i:is)) (Forest k a kids) new
       Just (Forest k a [ if j == i then kid' else kid | (j, kid) <- zip [0..] kids ])
 
 -- | Parse ALL derivations of a kind: every completed parse the
---   grammar's alternatives admit.  A derivation contributes only when
---   it consumes the WHOLE input (partial derivations are pruned at
---   every alternative boundary, so the enumeration stays exact); the
---   list is empty when nothing consumes the whole input, and (in the
---   v1 ambiguity-free domain) has at most one element when something
---   does.
+--   grammar's alternatives admit (a derivation contributes only when
+--   it consumes the WHOLE input — partial derivations are pruned at
+--   every alternative boundary).  The enumeration is exact for
+--   grammars whose nonterminals are non-nullable (no alternative
+--   derives the empty token sequence) and acyclic (no recursion
+--   without consuming a token); the zero-consumption prune is what
+--   bounds the recursion — a nullable derivation is dropped rather
+--   than looping, so 'parseAll' may return fewer results than 'parse'
+--   admits in exactly that case.  Several alternatives may match the
+--   same input, so a kind with more than one derivation yields one
+--   forest per derivation, in grammar order (enumerated, never
+--   silently resolved).
 parseAll :: Grammar -> [String] -> String -> [Forest]
 parseAll g input kind = go (ParseState [] input) kind
   where
@@ -314,7 +333,9 @@ deriveSeqAll g  st (s:ss) =
 --   PRUNING: a nonterminal derivation that consumes no tokens is
 --   dropped — this is what bounds the enumeration (each surviving
 --   step consumes strictly through the remaining tokens, so the
---   recursion terminates).
+--   recursion terminates for acyclic grammars; a nullable derivation
+--   is dropped, not looped, so the enumeration is exact exactly on the
+--   non-nullable, acyclic fragment).
 deriveSymAll :: Grammar -> ParseState -> Sym -> [(Forest, ParseState)]
 deriveSymAll _  (ParseState _ [])     (Term _)  = []
 deriveSymAll _  (ParseState c (t:ts)) (Term n)
@@ -417,30 +438,57 @@ plugForest (Residual (FCtx frames) _) new = foldl rebuild new frames
   where
     rebuild acc (Frame k a lft rgt) = Forest k a (lft ++ [acc] ++ rgt)
 
--- | The replacement report: the parse-set change a replacement induces.
---   The grammar's alternatives for the replaced node's kind, minus the
---   one its provenance claims — computed and reported, never resolved
---   (ambiguity preservation is this report, not a choice).
+-- | Local structural admission: does the node's own provenance derive
+--   it?  The node's kind must declare a production under its
+--   alternative name, and that production's symbols must match the
+--   children — a terminal consumes a child whose kind is the literal
+--   token; a nonterminal recurses.  This is the LOCAL check (children
+--   only): the residual position is not re-derived in v1.
+admits :: Grammar -> Forest -> Bool
+admits g (Forest k (Alt name) kids) =
+  case lookup k g of
+    Nothing   -> False
+    Just alts -> case lookup name alts of
+      Nothing   -> False
+      Just syms -> matches syms kids
+  where
+    matches [] [] = True
+    matches (Term t : ss) (Forest ck _ _ : cs) = ck == t && matches ss cs
+    matches (NonTerm n : ss) (kid@(Forest ck _ _) : cs) =
+      ck == n && admits g kid && matches ss cs
+    matches _ _ = False
+
+-- | The replacement report: the parse-set change a replacement induces,
+--   as the replaced node's local admission plus the grammar's other
+--   alternatives for its kind — the outcome is computed and reported,
+--   never resolved (ambiguity preservation is this report, not a
+--   choice).
 data ReparseReport = ReparseReport
-  { reparseKind  :: String
-  , reparseAlt   :: Alt
-  , reparseOther :: [String]
+  { reparseKind     :: String
+  , reparseAlt      :: Alt
+  , reparseAdmitted :: Bool
+  , reparseOther    :: [String]
   }
   deriving Eq
 
--- | 'ReparseReport' takes three precedence 11 arguments.
+-- | 'ReparseReport' takes four precedence 11 arguments.
 instance Show ReparseReport where
-  showsPrec d (ReparseReport k a other) =
+  showsPrec d (ReparseReport k a adm other) =
     showParen (d > 10)
       (  showString "ReparseReport "
-      . showsPrec 11 k . showChar ' ' . showsPrec 11 a . showChar ' ' . showsPrec 11 other
+      . showsPrec 11 k . showChar ' ' . showsPrec 11 a
+      . showChar ' ' . showsPrec 11 adm . showChar ' ' . showsPrec 11 other
       )
 
 -- | Compute the reparse report for the node standing at a residual's
---   selection after replacement.  The kind's other alternative names
---   are listed in grammar order; an unknown kind has no alternatives,
---   so its report lists none.
+--   selection after replacement: the node's LOCAL structural admission
+--   ('admits') is computed and reported alongside the kind's other
+--   alternative names, so the replacement-induced parse-set change is
+--   never hidden.  The other names are listed in grammar order; the
+--   admission is local to the node (the residual position is not
+--   re-derived in v1), and an unknown kind admits nothing and has no
+--   alternatives, so its report lists none.
 reparseReport :: Grammar -> Forest -> ReparseReport
-reparseReport g (Forest k a@(Alt name) _) =
+reparseReport g f@(Forest k a@(Alt name) _) =
   let alts = maybe [] (map fst) (lookup k g)
-  in  ReparseReport k a [ other | other <- alts, other /= name ]
+  in  ReparseReport k a (admits g f) [ other | other <- alts, other /= name ]
