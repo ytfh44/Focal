@@ -33,7 +33,11 @@ this document and the code disagree, the code wins and this document is fixed.
   zero- and two-candidate conflicts, the incremental layer
   ('Focal.Incremental') drives invalidation from claimed-vs-read variables,
   and the form layer ('Focal.Form') gates edits with validate-then-apply
-  (error provenance is the widget path, carried by the field residual).
+  (error provenance is the widget path, carried by the field residual);
+  the parser layer ('Focal.Parser') keeps choice provenance in its
+  frame-list residual, the query layer ('Focal.Query') reports candidate
+  repairs as an ordered ambiguity, and the workflow layer
+  ('Focal.Workflow') validates transition replacements through its gate.
 - **Effectful rung** — `FocusingM m c s t a b` (`Focal.Effectful`): failures,
   validation, logging, and state live in the monad `m`; `FocusingE` is the
   `m = Either e` case, and a pure `Focusing` embeds by purity.
@@ -53,7 +57,7 @@ this document and the code disagree, the code wins and this document is fixed.
 | **L0** | Structure definitions | `Focusing c s t a b` with `splitF :: s -> (a, c)`, `plugF :: c -> b -> t`; **type facts**: no `Env`/`IO`/state slot (locality), and the constructor is public, so forgery cannot be prevented at the type level; the failure-channel rung is `FocusingE e c s t a b` with `splitE :: s -> Either e (a, c)` and `plugE :: c -> b -> Either e t` (`Focal.Partial`); the effectful rung is `FocusingM m c s t a b` with `splitM :: s -> m (a, c)` and `plugM :: c -> b -> m t` (`Focal.Effectful`); the typed-syntax rung is `FocusingO (Stack i j) (Tm j) (Tm j) (Tm i) (Tm i)` built by `stackO` with `splitStack`/`plugStack` (`Focal.Syntax.Stack`) | The type system | Cannot be prevented (registered per instance in `conformance.md`) |
 | **L1** | Axiom | **A-LENS** (the only axiom): a lawful instance satisfies GP, PG, and PP on its declared domain (§2) | Assumption (assume–guarantee) + per-instance witness tests | Not in the lawful subclass; its behavior is protected by no law |
 | **L2** | Definitional identities | `idF` behavior (`splitF idF s == (s, ())`, `plugF idF () b == b`); the `composeF` plug law (true by unfolding) | Definition | None (no failure mode) |
-| **L3** | Corollaries | Occurrence ≠ value (corollary of GP); composition associativity and unit laws, modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | Derivation (§3) | None |
+| **L3** | Corollaries | Occurrence ≠ value (fixed-instance corollary of GP: `splitF f` is injective; the shipped `prop_occ_*` tests are positional-encoding checks); composition associativity and unit laws, modulo residual reassociation `((c1,c2),c3) ≅ (c1,(c2,c3))` | Derivation (§3) | None |
 | **L4** | Representation theorems | `withFocal` CPS form; the coend / co-Yoneda characterization; the Van Laarhoven form (§5) | Cited proofs + premises | Citing past the premises is unsound |
 | **L5** | Contracts | Constructor domains, codomains, failure modes, input invariance, claim discipline (§4) | Documentation + conformance matrix (+ later tests) | An unregistered exemption is a defect |
 | **L6** | Engineering constraints | Scope boundaries and process — single home: `ROADMAP.md` §0 | Review / CI | Design defect |
@@ -107,18 +111,19 @@ plugE1 c _ = c
 -- PP holds: the residual is the source itself, so re-deriving it is idempotent.
 ```
 
-**E2 — violates only GP** (type-changing shape: `s :: Int`, `a :: Word`):
+**E2 — violates only GP** (same-shape witness: `s = Maybe Int`, `a = b = Int`):
 
 ```haskell
-splitE2 :: Int -> (Word, ())
-splitE2 s = (fromIntegral (abs s), ())
+splitE2 :: Maybe Int -> (Int, ())
+splitE2 (Just n) = (n, ())
+splitE2 Nothing  = (0, ())
 
-plugE2 :: () -> Word -> Int
-plugE2 () = fromIntegral
+plugE2 :: () -> Int -> Maybe Int
+plugE2 () b = Just b
 
 -- check:
---   ( plugE2 (snd (splitE2 (-5))) (fst (splitE2 (-5))) /= (-5 :: Int)  -- GP fails
---   , fst (splitE2 (plugE2 () (3 :: Word))) == 3 )                     -- PG holds
+--   ( plugE2 (snd (splitE2 Nothing)) (fst (splitE2 Nothing)) /= (Nothing :: Maybe Int)  -- GP fails
+--   , fst (splitE2 (plugE2 () (3 :: Int))) == 3 )                                      -- PG holds
 -- == (True, True)
 -- PP holds: the residual is always ().
 ```
@@ -151,7 +156,12 @@ plug3 C1 B1 = Y
 
 - Locality (`plugF` has no `Env`/`IO`) is an **L0** type fact — not an axiom,
   and no property can witness it.
-- "Occurrence ≠ value" is an **L3** corollary of GP.
+- "Occurrence ≠ value" is an **L3** corollary of GP in its fixed-instance
+  form: for fixed `f`, `splitF f` is injective (`splitF f s1 = splitF f s2`
+  implies `s1 = s2`, by applying GP to both sides), so equal values with
+  different sources force different residuals. The shipped `prop_occ_*`
+  tests compare two positions of one instance (a positional-encoding
+  check), not the general statement across distinct instances.
 - The `idF` and `composeF` equations are **L2** definitional identities.
 - Structural enforcement does **not** hold for A-LENS: the constructor is
   public and `plugF` receives no `s`.

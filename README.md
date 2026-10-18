@@ -15,7 +15,7 @@ data Focusing c s t a b = Focusing
 - **`b`** — new focus (replaces `a` to form `t`)
 - **`c`** — **residual context**: the first-class value recording "how to rebuild the whole from a replacement focus"
 
-The library currently ships with a proof-of-concept set: Lens-like focusing, positional list focus, and tree-zipper navigation.
+The workspace ships the full specialization set: the core's Lens-like, list, and zipper foci, plus ten domain packages covering all twelve specializations (tables below).
 
 ---
 
@@ -184,7 +184,7 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 | **L0** | Structure facts (`Focusing` signatures; public constructor) | The type system | Signature inspection |
 | **L1** | Axiom **A-LENS** (GP ∧ PG ∧ PP) | Assumption per instance | L-GP / L-PG / L-PP families — see conformance |
 | **L2** | Definitional identities (`idF`; `composeF` plug law) | Definition | Definitional (no failure mode) |
-| **L3** | Corollaries (occurrence ≠ value; associativity/unit modulo residual reassociation) | Derivation | L-ASSOC / L-UNIT families |
+| **L3** | Corollaries (occurrence ≠ value, fixed-instance; associativity/unit modulo residual reassociation) | Derivation | L-ASSOC / L-UNIT families |
 | **L4** | Representation theorems (CPS, coend/co-Yoneda, Van Laarhoven form, the Either and effectful readings) | Cited proofs + premises | Paper proofs — [docs/foundation.md](docs/foundation.md) §5 |
 | **L5** | Contracts (domains, failure modes, input invariance) | Documentation + conformance matrix | [docs/conformance.md](docs/conformance.md) |
 | **L6** | Engineering constraints (scope and process) | Review / CI | [ROADMAP.md](ROADMAP.md) §0 |
@@ -195,7 +195,7 @@ The library's **only axiom** is **A-LENS**: every *lawful* instance satisfies, o
 
 ### Coverage
 
-The test suite has **136 QuickCheck properties** plus a doctest suite; every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
+The root suite has **136 QuickCheck properties** plus a doctest suite; the ten domain packages add their own law and contract suites (all CI-gated), and every law-id has witnesses — classification and per-instance verdicts in [docs/conformance.md](docs/conformance.md).
 
 ---
 
@@ -306,21 +306,21 @@ follows a deliberate boundary:
 
 3. **Composition is mechanical** — `(>>>)` nests residuals as `(c1, c2)`. This trivial composition works because the library deals only with pure spatial decomposition.
 
-### What's explicitly deferred
+### Where the core stops
 
-The remaining ~8 specializations require one or more of these, which the library deliberately does not provide:
+The remaining ~8 specializations need one or more of these capabilities; the core deliberately does not provide them — each ships as a separate package built on the same residual interface:
 
-| Requirement | Affected specializations |
+| Requirement | Specializations (package) |
 |---|---|
-| **Dependent / indexed types** (sort tracking at the type level) | Typed Syntax (4) |
-| **Operational semantics** (evaluation strategy, not just rebuild) | Redex (5) |
-| **Language-specific provenance** (alpha-equivalence, binding, substitution) | Refactoring (6) |
-| **Conflict detection & resolution** (non-trivial merge semantics) | Patch (7), Query (11) |
-| **Mutable dependency graphs** (invalidation, incremental recomputation) | Incremental (8) |
-| **Validation logic** (domain-specific, runtime-checked) | UI/Form (9), Workflow (12) |
-| **Non-tree structures** (grammars, DAGs with sharing, relational joins) | Parser (10), Query (11) |
+| **Dependent / indexed types** (sort tracking at the type level) | Typed Syntax (4) — `focal-syntax` |
+| **Operational semantics** (evaluation strategy, not just rebuild) | Redex (5) — `focal-redex` |
+| **Language-specific provenance** (alpha-equivalence, binding, substitution) | Refactoring (6) — `focal-refactor` |
+| **Conflict detection & resolution** (candidate-based, never silent) | Patch (7) — `focal-delta`; Query (11) — `focal-query` |
+| **Mutable dependency graphs** (invalidation, incremental recomputation) | Incremental (8) — `focal-incremental` |
+| **Validation logic** (domain-specific, runtime-checked) | UI/Form (9) — `focal-form`; Workflow (12) — `focal-workflow` |
+| **Non-tree structures** (grammars, relational joins) | Parser (10) — `focal-parser`; Query (11) — `focal-query` |
 
-Each of these is a genuine engineering problem that the Focal pattern can *structure* but not *solve*. The library draws the line at geometric decomposition of pure tree-like structures. Everything beyond that belongs in downstream packages that depend on `Focal.Core` but add domain-specific semantics.
+Each of these is a genuine engineering problem that the Focal pattern can *structure* but not *solve*. The core draws the line at geometric decomposition of pure tree-like structures; everything beyond that ships in packages that depend on `Focal.Core` and add domain-specific semantics — with their domain rules (evaluation strategies, validation policies, view-update policy, transition semantics) kept outside the core (§0.8).
 
 ### The DAG boundary
 

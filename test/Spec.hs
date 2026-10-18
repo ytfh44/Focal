@@ -71,7 +71,7 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
       , testProperty "elementF >>> idF = elementF" prop_lunit_right_list
       , testProperty "fromZip >>> idF = fromZip" prop_lunit_right_zipper
       ]
-  , testGroup "Occurrence ≠ value — corollary of L-GP"
+  , testGroup "Occurrence ≠ value — positional-encoding checks"
       [ testProperty "list: equal values at different indices" prop_occ_list
       , testProperty "Rose: equal subtrees at different paths" prop_occ_rose
       , testProperty "BinTree: equal leaves at different paths" prop_occ_binTree
@@ -617,8 +617,9 @@ prop_lunit_right_zipper t@(Rose _ kids) =
         in overF (f >>> idF) id t === overF f id t
 
 --------------------------------------------------------------------
--- Occurrence ≠ value — corollary of L-GP
---   Two different occurrences of the same value yield different residuals.
+-- Occurrence ≠ value — positional-encoding checks
+--   Fixed-instance corollary of L-GP: two positions of one instance
+--   whose values coincide carry different residuals.
 --------------------------------------------------------------------
 
 prop_occ_list :: [Int] -> Property
