@@ -26,6 +26,7 @@ tests = testGroup "focal-workflow — workflow plug"
       , testProperty "an undeclared replacement reports its step" prop_wf_reject
       , testProperty "the gate reports the first offending step" prop_wf_first_bad
       , testProperty "a rejected replacement leaves the context untouched" prop_wf_untouched
+      , testProperty "consecutive transitions must chain" prop_wf_continuity
       ]
   ]
 
@@ -75,3 +76,15 @@ prop_wf_untouched =
         === GateRejected 0 (Transition "rework" "review" "draft")
     , validateGate wf0 (plugRun ctx0 (ctxFocus ctx0)) === GateOk
     ]
+
+-- | Continuity: the reversed pair chains nowhere (the first step's
+--   target \'done\' is not the second step's source \'draft\'), so the
+--   gate rejects the run at the second step even though both
+--   transitions are declared.
+prop_wf_continuity :: Property
+prop_wf_continuity =
+  validateGate wf0
+    (Run [ Transition "approve" "review" "done"
+         , Transition "submit" "draft" "review"
+         ])
+    === GateRejected 1 (Transition "submit" "draft" "review")

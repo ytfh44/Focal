@@ -20,9 +20,12 @@
 --   The VALIDATION GATE accepts or rejects a task replacement by
 --   checking the run's state path against the workflow's transitions:
 --   every step must be a declared transition (name, source, and target
---   all matching).  The gate is STATIC STRUCTURE ONLY — it says whether
---   the trace is declared, never whether the workflow can run, and the
---   first offending step is reported with its index.
+--   all matching) AND consecutive steps must be chained (each step's
+--   source is the previous step's target).  A run may begin in any
+--   state — the workflow declares no initial state in v1.  The gate is
+--   STATIC STRUCTURE ONLY — it says whether the trace is declared,
+--   never whether the workflow can run, and the first offending step is
+--   reported with its index.
 --
 --   >>> import Focal.Workflow
 --   >>> let wf = Workflow ["draft", "review", "done"] [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
@@ -31,6 +34,8 @@
 --   GateOk
 --   >>> validateGate wf (Run [Transition "submit" "draft" "review", Transition "bogus" "review" "done"])
 --   GateRejected 1 (Transition "bogus" "review" "done")
+--   >>> validateGate wf (Run [Transition "approve" "review" "done", Transition "submit" "draft" "review"])
+--   GateRejected 1 (Transition "submit" "draft" "review")
 --   >>> fmap ctxPrefix (splitRun "approve" run)
 --   Just [Transition "submit" "draft" "review"]
 --   >>> fmap (\ctx -> plugRun ctx (Transition "reject" "review" "draft")) (splitRun "approve" run)
@@ -232,8 +237,8 @@ lookupComp n (c : cs)
 
 -- | The validation verdict of the gate: the first step that does not
 --   correspond to a declared transition of the workflow, if any (the
---   gate accepts a run exactly when every step is declared; static
---   structure only).
+--   gate accepts a run exactly when every step is declared and
+--   consecutive steps are chained; static structure only).
 --
 --   >>> import Focal.Workflow
 --   >>> GateOk
@@ -245,9 +250,12 @@ data GateVerdict
   | GateRejected Int Transition   -- ^ the step index and the offending transition
   deriving (Eq, Show)
 
--- | Run the validation gate: a run is accepted when every transition in
---   it is declared (name, source, and target all matching).  The first
---   offending step is reported with its index (never silently dropped).
+-- | Run the validation gate: a run is accepted when every transition is
+--   declared (name, source, and target all matching) AND consecutive
+--   transitions are chained (each step's source is the previous step's
+--   target).  A run may begin in any state — the workflow declares no
+--   initial state in v1.  The first offending step is reported with its
+--   index (never silently dropped).
 --
 --   >>> import Focal.Workflow
 --   >>> let wf = Workflow ["draft", "review", "done"] [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
@@ -260,13 +268,15 @@ data GateVerdict
 --   >>> validateGate wf (Run [Transition "draft" "done" "review"])
 --   GateRejected 0 (Transition "draft" "done" "review")
 validateGate :: Workflow -> Run -> GateVerdict
-validateGate wf (Run ts) = go 0 ts
+validateGate wf (Run ts) = go 0 Nothing ts
   where
-    go _ [] = GateOk
-    go i (t : rest)
-      | declared t = go (i + 1) rest
-      | otherwise  = GateRejected i t
+    go _ _ [] = GateOk
+    go i prev (t : rest)
+      | declared t && chained prev t = go (i + 1) (Just t) rest
+      | otherwise                    = GateRejected i t
     declared t = elem t (wfTransitions wf)
+    chained Nothing  _ = True
+    chained (Just p) t = transTo p == transFrom t
 
 --------------------------------------------------------------------
 -- The workflow plug: replacing the current task of a context
