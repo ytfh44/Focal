@@ -52,6 +52,8 @@ module Focal.Workflow
   , lookupComp
   , GateVerdict(..)
   , validateGate
+  , InvalidTransition(..)
+  , workflowPlug
   ) where
 
 --------------------------------------------------------------------
@@ -265,3 +267,50 @@ validateGate wf (Run ts) = go 0 ts
       | declared t = go (i + 1) rest
       | otherwise  = GateRejected i t
     declared t = elem t (wfTransitions wf)
+
+--------------------------------------------------------------------
+-- The workflow plug: replacing the current task of a context
+--------------------------------------------------------------------
+
+-- | The rejection of a task replacement: which step of the proposed
+--   run is invalid, and the transition standing there (the gate's
+--   report, never a silent drop).
+--
+--   >>> import Focal.Workflow
+--   >>> InvalidTransition 0 (Transition "rework" "review" "draft")
+--   InvalidTransition 0 (Transition "rework" "review" "draft")
+data InvalidTransition = InvalidTransition
+  { invalidStep  :: Int
+  , invalidTrans :: Transition
+  }
+  deriving Eq
+
+-- | 'InvalidTransition' takes two precedence 11 arguments.
+instance Show InvalidTransition where
+  showsPrec d (InvalidTransition i t) =
+    showParen (d > 10)
+      (showString "InvalidTransition " . showsPrec 11 i . showChar ' ' . showsPrec 11 t)
+
+-- | Replace the current task of a context: the proposed run (the
+--   context with the replacement plugged in) is checked by the
+--   validation gate BEFORE the replacement is accepted.  A valid
+--   replacement yields the new run; an invalid one reports the
+--   offending step and leaves the context untouched.
+--
+--   >>> import Focal.Workflow
+--   >>> let wf = Workflow ["draft", "review", "done"] [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
+--   >>> let ctx = TransitionContext [] (Transition "submit" "draft" "review") [Transition "approve" "review" "done"]
+--   >>> workflowPlug wf ctx (Transition "submit" "draft" "review")
+--   Right (Run [Transition "submit" "draft" "review",Transition "approve" "review" "done"])
+--   >>> workflowPlug wf ctx (Transition "rework" "review" "draft")
+--   Left (InvalidTransition 0 (Transition "rework" "review" "draft"))
+--   >>> let ctx2 = TransitionContext [Transition "submit" "draft" "review"] (Transition "approve" "review" "done") []
+--   >>> workflowPlug wf ctx2 (Transition "rework" "review" "draft")
+--   Left (InvalidTransition 1 (Transition "rework" "review" "draft"))
+workflowPlug :: Workflow -> TransitionContext -> Transition
+             -> Either InvalidTransition Run
+workflowPlug wf ctx new =
+  let run = plugRun ctx new
+   in case validateGate wf run of
+        GateOk           -> Right run
+        GateRejected i t -> Left (InvalidTransition i t)
