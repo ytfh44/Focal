@@ -51,6 +51,8 @@ module Focal.Query
   , Policy
   , Putback(..)
   , putbackRow
+  , RelDelta(..)
+  , relPutback
   , fixedPolicy
   , writeBack
   ) where
@@ -284,3 +286,49 @@ fixedPolicy cs _ _ _ = cs
 --   [Candidate "name" "z"]
 writeBack :: Policy
 writeBack _ col new = [Candidate col new]
+
+--------------------------------------------------------------------
+-- Relational putback: the delta and its provenance
+--------------------------------------------------------------------
+
+-- | A relational delta: which source row changed, which column, and the
+--   new value (the provenance of the edit, relation-level).
+--
+--   >>> import Focal.Query
+--   >>> RelDelta 0 "name" "z"
+--   RelDelta 0 "name" "z"
+data RelDelta = RelDelta
+  { deltaRow    :: Int
+  , deltaColumn :: String
+  , deltaValue  :: String
+  }
+  deriving Eq
+
+-- | 'RelDelta' takes three precedence 11 arguments.
+instance Show RelDelta where
+  showsPrec d (RelDelta r c v) =
+    showParen (d > 10)
+      (  showString "RelDelta " . showsPrec 11 r . showChar ' '
+      . showsPrec 11 c . showChar ' ' . showsPrec 11 v
+      )
+
+-- | Relational putback: place a view-row edit through the policy.  A
+--   single candidate becomes the relation-level delta (at the row whose
+--   provenance the view row carries); zero or several candidates report
+--   the ambiguity with the full ordered list (never resolved).
+--
+--   >>> import Focal.Query
+--   >>> let t = Table ["id", "name"] [[("id", "1"), ("name", "a")]]
+--   >>> let vr = case project (Projection ["name"]) t of { View (r : _) -> r; View [] -> ViewRow [] 0 (JoinWitness 0 Nothing) }
+--   >>> relPutback writeBack t vr "name" "z"
+--   Right (RelDelta 0 "name" "z")
+--   >>> relPutback (fixedPolicy [Candidate "name" "z", Candidate "id" "9"]) t vr "name" "z"
+--   Left [Candidate "name" "z",Candidate "id" "9"]
+--   >>> relPutback (fixedPolicy []) t vr "name" "z"
+--   Left []
+relPutback :: Policy -> Table -> ViewRow -> String -> String
+           -> Either [Candidate] RelDelta
+relPutback policy tbl vr col new =
+  case policy tbl col new of
+    [c] -> Right (RelDelta (viewSource vr) (candColumn c) (candValue c))
+    cs  -> Left cs

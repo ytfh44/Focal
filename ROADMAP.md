@@ -195,7 +195,7 @@ Depends on: 25. Done = ① implementation ② ambiguity tests. [x]
 Depends on: 19, 26. Done = ① modules + docs. [x]
 
 28. Implement relational putback: view edit -> `Either AmbiguousPutback RelDelta`.
-Depends on: 27. Done = ① implementation ② policy tests.
+Depends on: 27. Done = ① implementation ② policy tests. [x]
 
 29. Establish `focal-workflow`: transition context, rollback plan, validation gate.
 Depends on: 6, 19, 24. Done = ① modules + docs.
