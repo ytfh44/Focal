@@ -168,7 +168,7 @@ Depends on: 18. Done = ① implementation ② conflict tests. [x]
 Depends on: 17, 19. Done = ① integration ② patch round-trip tests. [x]
 
 21. Establish `focal-incremental`: dependency trace, memo cell, invalidation graph.
-Depends on: 19. Done = ① modules + docs.
+Depends on: 19. Done = ① modules + docs. [x]
 
 22. Implement incremental plug: local delta drives invalidation; outputs `OutputDelta`.
 Depends on: 21. Done = ① implementation ② invalidation tests.
