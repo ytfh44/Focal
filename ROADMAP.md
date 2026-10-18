@@ -189,7 +189,7 @@ Depends on: 23. Done = ① implementation ② validation tests. [x]
 Depends on: 6, 10, 19. Done = ① modules + docs. [x]
 
 26. Implement grammar focus: parse forest local replacement, ambiguity preservation, non-tree residual.
-Depends on: 25. Done = ① implementation ② ambiguity tests.
+Depends on: 25. Done = ① implementation ② ambiguity tests. [x]
 
 27. Establish `focal-query`: projection provenance, join witness, view-update policy.
 Depends on: 19, 26. Done = ① modules + docs.

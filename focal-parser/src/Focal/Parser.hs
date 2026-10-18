@@ -24,6 +24,19 @@
 --   (potentially ambiguous; possibly never exercised by an input) —
 --   and REPORTED, never resolved.
 --
+--   The FOREST focus extends the node focus: its residual is not a tree
+--   but a FRAME LIST (nearest-first) — each frame records one ancestor's
+--   kind and provenance plus the siblings left and right of the hole at
+--   that level.  The selection coordinate the focus was taken at travels
+--   in the residual independently of the frames, so the replacement laws
+--   are stated RELATIVE TO that coordinate: 'plugForest' rebuilds from
+--   the frames with the new node in the hole, and the coordinate
+--   re-selects the replaced node.  A replacement also induces a
+--   parse-set change — for the replaced node's kind, the grammar's
+--   alternatives minus the one the node's provenance claims — which
+--   'reparseReport' COMPUTES and REPORTS, never resolves: ambiguity
+--   preservation is the report, not a choice.
+--
 --   >>> import Focal.Parser
 --   >>> let g = [("n", [("lit", [Term "x"])]), ("p", [("pair", [NonTerm "n", NonTerm "n"])])]
 --   >>> parse g ["x", "x"] "p"
@@ -54,6 +67,20 @@
 --   Just [Alt "pair",Alt "zz"]
 --   >>> fmap nodeAlt (replaceAt (Selection [1]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []],Forest "m" (Alt "lit2") []]) (Forest "z" (Alt "zz") []) >>= select (Selection [1]))
 --   Just (Alt "zz")
+--   >>> fmap focusResidual (focusForest (Selection [1]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []],Forest "m" (Alt "lit2") []]))
+--   Just (Residual (FCtx [Frame "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []]] []]) (Selection [1]))
+--   >>> fmap (\ff -> plugForest (focusResidual ff) (Forest "z" (Alt "zz") [])) (focusForest (Selection [1]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []],Forest "m" (Alt "lit2") []]))
+--   Just (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []],Forest "z" (Alt "zz") []])
+--   >>> fmap (\ff -> plugForest (focusResidual ff) (Forest "z" (Alt "zz") [])) (focusForest (Selection [0,0]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "x" (Alt "x") []],Forest "m" (Alt "lit2") []]))
+--   Just (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [Forest "z" (Alt "zz") []],Forest "m" (Alt "lit2") []])
+--   >>> fmap (\ff -> select (residualSel (focusResidual ff)) (plugForest (focusResidual ff) (Forest "z" (Alt "zz") []))) (focusForest (Selection [1]) (Forest "p" (Alt "pair") [Forest "n" (Alt "lit") [],Forest "m" (Alt "lit2") []]))
+--   Just (Just (Forest "z" (Alt "zz") []))
+--   >>> reparseReport [("p", [("pair", []), ("solo", [])])] (Forest "p" (Alt "pair") [])
+--   ReparseReport "p" (Alt "pair") ["solo"]
+--   >>> reparseReport [("p", [("pair", [])])] (Forest "p" (Alt "pair") [])
+--   ReparseReport "p" (Alt "pair") []
+--   >>> fmap focusResidual (focusForest (Selection [5]) (Forest "p" (Alt "pair") []))
+--   Nothing
 module Focal.Parser
   ( Alt(..)
   , Sym(..)
@@ -75,6 +102,14 @@ module Focal.Parser
   , NodeFocus(..)
   , focusAt
   , replaceAt
+  , Frame(..)
+  , FCtx(..)
+  , Residual(..)
+  , ForestFocus(..)
+  , focusForest
+  , plugForest
+  , ReparseReport(..)
+  , reparseReport
   ) where
 
 --------------------------------------------------------------------
@@ -295,3 +330,117 @@ deriveSymAll g  st                    (NonTerm k) =
       , grew s s'
       ]
     grew (ParseState c0 _) (ParseState c1 _) = length c1 > length c0
+
+--------------------------------------------------------------------
+-- Forest focus: the frame-list residual, replacement, and the
+-- parse-set report (ambiguity preservation, never resolution)
+--------------------------------------------------------------------
+
+-- | One frame of a forest context: the ancestor's kind and provenance,
+--   and the siblings left/right of the hole at that level.
+data Frame = Frame
+  { frameKind  :: String
+  , frameAlt   :: Alt
+  , frameLeft  :: [Forest]
+  , frameRight :: [Forest]
+  }
+  deriving Eq
+
+-- | 'Frame' takes four precedence 11 arguments.
+instance Show Frame where
+  showsPrec d (Frame k a l r) =
+    showParen (d > 10)
+      (  showString "Frame " . showsPrec 11 k . showChar ' ' . showsPrec 11 a
+      . showChar ' ' . showsPrec 11 l . showChar ' ' . showsPrec 11 r
+      )
+
+-- | A forest context: the frames from the hole up to the root
+--   (nearest-first).  The residual is NOT a tree — it is this frame
+--   list; every ancestor's provenance travels in its frame, so choice
+--   records survive by construction.
+newtype FCtx = FCtx [Frame]
+  deriving (Eq, Show)
+
+-- | The residual of a forest focus: the frame-list context and the
+--   selection coordinate the focus was taken at.
+data Residual = Residual
+  { residualCtx :: FCtx
+  , residualSel :: Selection
+  }
+  deriving Eq
+
+-- | 'Residual' takes two precedence 11 arguments.
+instance Show Residual where
+  showsPrec d (Residual c s) =
+    showParen (d > 10)
+      (showString "Residual " . showsPrec 11 c . showChar ' ' . showsPrec 11 s)
+
+-- | The forest focus: the selected node and its residual — the context
+--   plus the selection coordinate (the replacement laws are stated
+--   relative to this coordinate).
+data ForestFocus = ForestFocus
+  { focused       :: Forest
+  , focusResidual :: Residual
+  }
+  deriving Eq
+
+-- | 'ForestFocus' takes two precedence 11 arguments.
+instance Show ForestFocus where
+  showsPrec d (ForestFocus f r) =
+    showParen (d > 10)
+      (showString "ForestFocus " . showsPrec 11 f . showChar ' ' . showsPrec 11 r)
+
+-- | Focus a selection: 'Nothing' when the path is out of range (the
+--   coordinate is reported as absent, never clamped).  The frames are
+--   collected nearest-first (each level's frame is prepended as we
+--   descend, so the deepest frame lands first) with the siblings split
+--   around each hole.
+focusForest :: Selection -> Forest -> Maybe ForestFocus
+focusForest sel root = do
+  (node, frames) <- go sel root []
+  Just (ForestFocus node (Residual (FCtx frames) sel))
+  where
+    go (Selection [])     cur acc = Just (cur, acc)
+    go (Selection (i:is)) (Forest k a kids) acc
+      | i < 0 || i >= length kids = Nothing
+      | otherwise =
+          go (Selection is) (kids !! i)
+             (Frame k a (take i kids) (drop (i + 1) kids) : acc)
+
+-- | Plug a replacement into the residual: rebuild from the frames
+--   (siblings and provenance) with the new node in the hole.  Total:
+--   the frame list is ordered nearest-first, so folding it left
+--   rebuilds outward from the hole — the nearest frame wraps the new
+--   node first and the root frame wraps last.
+plugForest :: Residual -> Forest -> Forest
+plugForest (Residual (FCtx frames) _) new = foldl rebuild new frames
+  where
+    rebuild acc (Frame k a lft rgt) = Forest k a (lft ++ [acc] ++ rgt)
+
+-- | The replacement report: the parse-set change a replacement induces.
+--   The grammar's alternatives for the replaced node's kind, minus the
+--   one its provenance claims — computed and reported, never resolved
+--   (ambiguity preservation is this report, not a choice).
+data ReparseReport = ReparseReport
+  { reparseKind  :: String
+  , reparseAlt   :: Alt
+  , reparseOther :: [String]
+  }
+  deriving Eq
+
+-- | 'ReparseReport' takes three precedence 11 arguments.
+instance Show ReparseReport where
+  showsPrec d (ReparseReport k a other) =
+    showParen (d > 10)
+      (  showString "ReparseReport "
+      . showsPrec 11 k . showChar ' ' . showsPrec 11 a . showChar ' ' . showsPrec 11 other
+      )
+
+-- | Compute the reparse report for the node standing at a residual's
+--   selection after replacement.  The kind's other alternative names
+--   are listed in grammar order; an unknown kind has no alternatives,
+--   so its report lists none.
+reparseReport :: Grammar -> Forest -> ReparseReport
+reparseReport g (Forest k a@(Alt name) _) =
+  let alts = maybe [] (map fst) (lookup k g)
+  in  ReparseReport k a [ other | other <- alts, other /= name ]
