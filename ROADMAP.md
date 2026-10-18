@@ -192,7 +192,7 @@ Depends on: 6, 10, 19. Done = ① modules + docs. [x]
 Depends on: 25. Done = ① implementation ② ambiguity tests. [x]
 
 27. Establish `focal-query`: projection provenance, join witness, view-update policy.
-Depends on: 19, 26. Done = ① modules + docs.
+Depends on: 19, 26. Done = ① modules + docs. [x]
 
 28. Implement relational putback: view edit -> `Either AmbiguousPutback RelDelta`.
 Depends on: 27. Done = ① implementation ② policy tests.
