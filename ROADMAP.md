@@ -208,7 +208,7 @@ Depends on: 29. Done = ① implementation ② transition tests. [x]
 ## P6 — Cross-package consistency and release (items 31–32)
 
 31. Cross-package consistency tests: core, syntax, redex, refactor, delta, incremental, form, parser, query, and workflow share the frozen law-id vocabulary; each package's conformance suite cites `docs/foundation.md` §3 law-ids.
-Depends on: 8–30. Done = ① suite runs against frozen law-ids ② every package registers its verdicts.
+Depends on: 8–30. Done = ① suite runs against frozen law-ids ② every package registers its verdicts. [x]
 
 32. Publish `focal-0.2` integration release: core stable; strong specializations available; mid-strength specializations have minimal implementations; weak specializations annotated as domain frameworks.
 Depends on: 31. Done = ① release published ② README/conformance reflect the released surface ③ no claim without a witness or a registered gap.

@@ -75,7 +75,14 @@ plus the doctest suite):
 - **Generic derivation: 4 of 136** (`prop_gen_*`).
 - **Optional focus: 6 of 136** (`prop_opt_*`).
 - **Typed syntax (focal-syntax suite): 3 properties** (`prop_tm_*`) — registered
-  per package; the root total stays 136 until item 31 unifies the vocabulary.
+  per package; the root total stays 136; the frozen vocabulary is exercised
+  cross-package by the consistency suite below.
+- **Cross-package consistency (focal-consistency suite): 23 properties** — one
+  group per frozen §3 law-id (`L-GP`, `L-PG`, `L-PP`, `L-OVF`, `L-ASSOC`,
+  `L-UNIT`, `L-NORM`, `L-TVL`) plus the registered channel families and domain
+  round trips, each witness running through a package's public surface (all
+  ten packages covered); registered as its own package; the root total stays
+  136.
 - **Redex loop (focal-redex suite): 18 properties** (`prop_rd_*`) — 14 concrete
   regressions (decompose/plug/step plus the `redexF` rung trio) and 4 laws
   (plug-after-decompose, progress, normalization, head step = beta);
