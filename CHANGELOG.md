@@ -45,6 +45,13 @@ specializations implemented (rows 11–12 annotated as domain frameworks).
 - Added `focal-consistency` (test-only): the cross-package consistency
   suite over the frozen law-id vocabulary (23 properties, all ten
   packages).
+- Corrections from the independent audit pass: `renderSpans` reports global
+  half-open text offsets; the form putback stores the validator's adopted
+  value (the residual keeps the raw input); the workflow gate checks
+  transition continuity in addition to declaration membership; `composeEdit`,
+  `rename`, and `focusProv` document their actual semantics (edit transport,
+  positional transposition, root-first provenance chain).
+
 - Documentation: `docs/foundation.md` §1/§3, the conformance matrix, the
   README specialization tables, and the roadmap reflect the released
   surface. No `focal-core` API changes in this release.
