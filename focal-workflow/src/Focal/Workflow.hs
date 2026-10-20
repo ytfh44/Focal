@@ -27,6 +27,14 @@
 --   never whether the workflow can run, and the first offending step is
 --   reported with its index.
 --
+--   For the PG-analogue, the replacement must carry the focused
+--   transition's name ('splitRun' addresses transitions by name, first
+--   occurrence wins), so that a re-split of the plugged run recovers the
+--   replacement.  'plugRun' is the RAW plug and does not check this: a
+--   name-changing replacement is a legitimate value but outside that
+--   premise.  'workflowPlug' is the validated route — it enforces the
+--   name premise AND the validation gate.
+--
 --   >>> import Focal.Workflow
 --   >>> let wf = Workflow ["draft", "review", "done"] [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
 --   >>> let run = Run [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
@@ -158,6 +166,13 @@ splitRun name (Run ts) = go [] ts
 
 -- | Plug a replacement into the context: the run rebuilt with the focus
 --   replaced (the prefix and suffix are untouched).
+--
+--   For the PG-analogue to hold the replacement must carry the focused
+--   transition's name: 'splitRun' addresses transitions by name (first
+--   occurrence wins), so a name-changing replacement re-splits at a
+--   different transition.  A name-changing replacement is a legitimate
+--   value but outside that premise; 'workflowPlug' is the validated
+--   route.
 --
 --   >>> import Focal.Workflow
 --   >>> let ctx = TransitionContext [Transition "submit" "draft" "review"] (Transition "approve" "review" "done") []
@@ -302,10 +317,16 @@ instance Show InvalidTransition where
       (showString "InvalidTransition " . showsPrec 11 i . showChar ' ' . showsPrec 11 t)
 
 -- | Replace the current task of a context: the proposed run (the
---   context with the replacement plugged in) is checked by the
---   validation gate BEFORE the replacement is accepted.  A valid
---   replacement yields the new run; an invalid one reports the
---   offending step and leaves the context untouched.
+--   context with the replacement plugged in) is accepted only when the
+--   replacement carries the FOCUSED transition's name AND the validation
+--   gate accepts the proposed run.  The name premise comes first: it is
+--   the premise the PG-analogue needs, because 'splitRun' addresses
+--   transitions by name (first occurrence wins), so a replacement under
+--   another name is not the transition the split names.  A
+--   name-changing replacement is rejected at the focus's index (the
+--   length of the context's prefix) with the offered transition; an
+--   invalid run reports the offending step.  Either way the context is
+--   left untouched.
 --
 --   >>> import Focal.Workflow
 --   >>> let wf = Workflow ["draft", "review", "done"] [Transition "submit" "draft" "review", Transition "approve" "review" "done"]
@@ -319,8 +340,11 @@ instance Show InvalidTransition where
 --   Left (InvalidTransition 1 (Transition "rework" "review" "draft"))
 workflowPlug :: Workflow -> TransitionContext -> Transition
              -> Either InvalidTransition Run
-workflowPlug wf ctx new =
-  let run = plugRun ctx new
-   in case validateGate wf run of
-        GateOk           -> Right run
-        GateRejected i t -> Left (InvalidTransition i t)
+workflowPlug wf ctx new
+  | transName new /= transName (ctxFocus ctx) =
+      Left (InvalidTransition (length (ctxPrefix ctx)) new)
+  | otherwise =
+      let run = plugRun ctx new
+       in case validateGate wf run of
+            GateOk           -> Right run
+            GateRejected i t -> Left (InvalidTransition i t)
