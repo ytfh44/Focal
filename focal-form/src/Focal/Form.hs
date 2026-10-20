@@ -12,13 +12,19 @@
 --   ('validateForm'); an applied field stores the validator's adopted
 --   value (its 'Right' result), not the raw input — and keys the form
 --   does not mention persist (re-validation preserves the rest of the
---   model).  The field residual ('FieldResidual') is what a
+--   model).  A model key is the last segment of the widget path, so two
+--   fields can collide on one key; the collision is a validation
+--   failure reported once per colliding field, never silently resolved
+--   by the last writer.  EVERY failure is reported together: the
+--   per-field validation failures first, then the duplicate model-key
+--   collisions.  The field residual ('FieldResidual') is what a
 --   failed validation preserves — the raw input plus the ORIGINAL path
 --   and kind, so the error is reproducible and the user's input is never
 --   lost; 'revalidate' re-runs a residual against a different registry
 --   (the form moved) and the provenance follows the field, not the
 --   registry ('residuals' collects every failure's residual — the raw
---   inputs a retry would need).
+--   inputs a retry would need, the validation failures and the
+--   collisions alike).
 --
 --   >>> import Focal.Form
 --   >>> pathString (WidgetPath ["form", "email"])
@@ -46,6 +52,14 @@
 --   Right (ModelSnapshot [("email","a@b"),("user","u")])
 --   >>> validateForm [("email", nonEmpty)] (ModelSnapshot [("user", "u")]) [Field (WidgetPath ["form", "email"]) "" "email", Field (WidgetPath ["form", "name"]) "n" "nonempty"]
 --   Left [FormError form/email "empty",FormError form/name "unknown field kind: nonempty"]
+--   >>> validateForm [("email", nonEmpty)] (ModelSnapshot []) [Field (WidgetPath ["a", "x"]) "1" "email", Field (WidgetPath ["b", "x"]) "2" "email"]
+--   Left [FormError b/x "duplicate model key: x"]
+--   >>> validateForm [("email", nonEmpty)] (ModelSnapshot []) [Field (WidgetPath ["a", "x"]) "" "email", Field (WidgetPath ["b", "x"]) "2" "email"]
+--   Left [FormError a/x "empty",FormError b/x "duplicate model key: x"]
+--   >>> validateForm [("email", nonEmpty)] (ModelSnapshot []) [Field (WidgetPath ["a", "x"]) "1" "email", Field (WidgetPath ["a", "x"]) "1" "email"]
+--   Left [FormError a/x "duplicate model key: x"]
+--   >>> residuals [("email", nonEmpty)] [Field (WidgetPath ["a", "x"]) "1" "email", Field (WidgetPath ["a", "x"]) "1" "email"]
+--   [FieldResidual a/x "1" "email"]
 module Focal.Form
   ( WidgetPath(..)
   , pathString
@@ -157,7 +171,13 @@ fieldKey (Field (WidgetPath ps) _ _) = case reverse ps of
 --------------------------------------------------------------------
 
 -- | Validate-then-apply: every field must validate (all-or-nothing);
---   failures report every error and leave the snapshot untouched.
+--   failures report EVERY error and leave the snapshot untouched — the
+--   per-field validation failures first, then the duplicate model-key
+--   collisions.  A field whose model key repeats an earlier field's key
+--   is a failure too (the snapshot would hold one value per key, so the
+--   collision has to be reported, not silently resolved) and is
+--   reported per colliding field, in field order, after the validation
+--   failures.
 --   Applied fields overwrite their model key; untouched keys persist
 --   (re-validation preserves the rest of the model).  The value stored
 --   under a field's key is the validator's adopted value (its 'Right'
@@ -165,12 +185,45 @@ fieldKey (Field (WidgetPath ps) _ _) = case reverse ps of
 --   retry shows the user's actual input).
 validateForm :: Validators -> ModelSnapshot -> [Field] -> Either [FormError] ModelSnapshot
 validateForm vs (ModelSnapshot kvs) fields =
-  case [ (f, e) | f <- fields, Left e <- [validateField vs f] ] of
-    errs@(_ : _) -> Left (map snd errs)
+  case fieldErrs ++ duplicateErrors dups of
+    errs@(_ : _) -> Left errs
     []           ->
       let updates = [ (fieldKey f, v) | f <- fields, Right v <- [validateField vs f] ]
           kept    = [ kv | kv@(k, _) <- kvs, k `notElem` map fst updates ]
       in  Right (ModelSnapshot (updates ++ kept))
+  where
+    -- The per-field validation failures, in field order.
+    fieldErrs = [ e | f <- fields, Left e <- [validateField vs f] ]
+    -- The colliding fields, in field order.
+    dups      = duplicateFields fields
+
+-- | Whether each field collides on a model key: the first field
+--   carrying a key is the one that would be applied, every LATER field
+--   with that key is a failure of its own.  The selection is
+--   POSITIONAL — the flags are per position, so two fully identical
+--   fields collide only for the later one, and a field that merely
+--   equals a colliding field is not itself a collision.  This is the
+--   single source of the collisions — the error list and the residuals
+--   both derive from it.
+duplicatePositions :: [Field] -> [Bool]
+duplicatePositions = go []
+  where
+    go _ [] = []
+    go seen (f : rest)
+      | k `elem` seen = True : go seen rest
+      | otherwise     = False : go (k : seen) rest
+      where k = fieldKey f
+
+-- | The fields that collide on a model key, in field order: the fields
+--   whose POSITION is a collision, selected from the positional walk
+--   above.
+duplicateFields :: [Field] -> [Field]
+duplicateFields fs = [ f | (f, dup) <- zip fs (duplicatePositions fs), dup ]
+
+-- | One error per colliding field: the duplicate model key.
+duplicateErrors :: [Field] -> [FormError]
+duplicateErrors fs =
+  [ FormError (fieldPath f) ("duplicate model key: " ++ fieldKey f) | f <- fs ]
 
 --------------------------------------------------------------------
 -- Field residuals
@@ -206,13 +259,24 @@ revalidate (FieldResidual p raw kind) vs =
     Nothing -> Left (FormError p ("unknown field kind: " ++ kind))
     Just v  -> either (Left . FormError p) Right (v raw)
 
--- | Every failure's residual (the raw inputs a retry would need).
+-- | Every failure's residual (the raw inputs a retry would need): the
+--   per-field validation failures and the duplicate model-key
+--   collisions alike, in field order.  The collision selection is
+--   POSITIONAL — a collision is a failure of the later field carrying
+--   the repeated key, and of that field only, so a field that merely
+--   equals a colliding field keeps no residual.
 residuals :: Validators -> [Field] -> [FieldResidual]
-residuals vs fields = [ residualOf f | f <- fields, isFailure f ]
+residuals vs fields =
+  [ residualOf f | (f, dup) <- zip fields dups, isFailure f || dup ]
   where
+    -- Whether the field's own validation failed.
     isFailure f = case validateField vs f of
       Left _  -> True
       Right _ -> False
+    -- The collision flags, one per position: a field keeps a residual
+    -- when its validation failed, or when its POSITION is a collision —
+    -- the later field carrying a repeated key, and that field only.
+    dups = duplicatePositions fields
 
 --------------------------------------------------------------------
 -- Form putback
@@ -254,9 +318,12 @@ putback vs snap f = case validateField vs f of
 
 -- | Apply one validated field, at its adopted value, to a snapshot by
 --   key (same ordering as 'validateForm': the update first, then the
---   untouched keys).  The stored value is the validator's adopted value
---   (its 'Right' result); the raw input survives only in the field
---   residual (a retry shows the user's actual input).
+--   untouched keys).  The string argument is the validator's 'Right'
+--   result for this field; the type cannot separate a validated value
+--   from a raw input, so passing a raw input is the caller's
+--   responsibility — 'putback' is that caller and feeds exactly the
+--   validated value.  The raw input survives only in the field residual
+--   (a retry shows the user's actual input).
 applyOne :: ModelSnapshot -> Field -> String -> ModelSnapshot
 applyOne (ModelSnapshot kvs) f v =
   let k    = fieldKey f

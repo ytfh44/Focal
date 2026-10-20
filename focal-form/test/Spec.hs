@@ -6,6 +6,7 @@ import Test.Tasty.QuickCheck (testProperty, (===))
 
 import Focal.Form
   ( Field(..)
+  , FieldResidual(..)
   , FormError(..)
   , ModelSnapshot(..)
   , PutbackResult(..)
@@ -14,6 +15,7 @@ import Focal.Form
   , putback
   , revalidate
   , residualOf
+  , residuals
   , validateForm
   )
 
@@ -29,6 +31,9 @@ tests = testGroup "focal-form — form putback"
       , testProperty "revalidation keeps the original provenance" prop_fm_revalidate_provenance
       , testProperty "form validation is all-or-nothing" prop_fm_validate_form_allornothing
       , testProperty "a normalizing validator's adopted value reaches the model" prop_fm_adopts_value
+      , testProperty "colliding model keys are rejected" prop_fm_duplicate_key
+      , testProperty "every failure is reported" prop_fm_validate_form_every_failure
+      , testProperty "a collision preserves the colliding field's residual" prop_fm_residuals_duplicate
       ]
   ]
 
@@ -113,3 +118,50 @@ prop_fm_adopts_value = conjoin
     vs0    = [("email", trim)]
     snap0  = ModelSnapshot []
     pEmail = WidgetPath ["form", "email"]
+
+-- | Colliding model keys are rejected.  A model key is the last segment of
+--   the widget path, so these two fields would write the same key; the
+--   collision is a validation failure reported at the colliding field
+--   (the later one, since the earlier one is the value that would apply)
+--   and the snapshot is not built.  Without the check the last writer
+--   would win silently, so this witness fails for that implementation.
+prop_fm_duplicate_key :: Property
+prop_fm_duplicate_key =
+  validateForm [("id", nonEmpty)] (ModelSnapshot [])
+    [ Field (WidgetPath ["a", "x"]) "1" "id"
+    , Field (WidgetPath ["b", "x"]) "2" "id"
+    ]
+    === Left [FormError (WidgetPath ["b", "x"]) "duplicate model key: x"]
+
+-- | EVERY failure is reported: a form with both an invalid field and a
+--   duplicate model key reports the validation failure first, then the
+--   collision.  An implementation that returns as soon as the
+--   validation errors are known drops the collision, so this witness
+--   fails for that one.
+prop_fm_validate_form_every_failure :: Property
+prop_fm_validate_form_every_failure =
+  validateForm vs0 (ModelSnapshot [])
+    [ Field pA "" "email"
+    , Field pB "2" "email"
+    ]
+    === Left [ FormError pA "empty"
+             , FormError pB "duplicate model key: x"
+             ]
+  where
+    vs0 = [("email", nonEmpty)]
+    pA  = WidgetPath ["a", "x"]
+    pB  = WidgetPath ["b", "x"]
+
+-- | A duplicate model key is a failure of the LATER field, so that
+--   field's residual is preserved like any other failure's (the raw
+--   input a retry needs, at the original path and kind).  An
+--   implementation that collects only the validation failures returns
+--   the empty list here, so this witness fails for that one.
+prop_fm_residuals_duplicate :: Property
+prop_fm_residuals_duplicate =
+  residuals vs0 [ Field pA "1" "email", Field pB "2" "email" ]
+    === [FieldResidual pB "2" "email"]
+  where
+    vs0 = [("email", nonEmpty)]
+    pA  = WidgetPath ["a", "x"]
+    pB  = WidgetPath ["b", "x"]
