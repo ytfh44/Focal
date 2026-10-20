@@ -10,8 +10,9 @@ import Focal.Parser
   , ForestFocus(..)
   , Grammar
   , NodeFocus(..)
+  , ParseState(..)
   , ReparseReport(..)
-  , Residual(..)
+  , Residual
   , Selection(..)
   , Sym(..)
   , focusAt
@@ -19,8 +20,10 @@ import Focal.Parser
   , nodeAlt
   , parse
   , parseAll
+  , parseOne
   , plugForest
   , reparseReport
+  , residualSel
   , select
   )
 
@@ -36,6 +39,11 @@ tests = testGroup "focal-parser — grammar focus"
       , testProperty "the reparse report lists the kind's other alternatives" prop_ps_reparse_report
       , testProperty "the multi-derivation case enumerates both alternatives" prop_ps_ambiguity_multi
       , testProperty "a nullable derivation is dropped, not looped" prop_ps_nullable_divergence
+      , testProperty "the plugged tree re-hits the residual's coordinate" prop_ps_rehit
+      ]
+  , testGroup "Derivation progress"
+      [ testProperty "a cyclic grammar terminates with no derivation" prop_ps_cycle_terminates
+      , testProperty "a productive right-recursive grammar still parses" prop_ps_recursive_grammar
       ]
   ]
 
@@ -162,3 +170,95 @@ prop_ps_nullable_divergence = conjoin
     -- The nullable grammar: "e" derives nothing; "q" is "e" then "x".
     ge :: Grammar
     ge = [("e", [("empty", [])]), ("q", [("two", [NonTerm "e", Term "x"])])]
+
+-- | The re-hit clause for the forest focus, over the whole plug
+--   domain: a focus taken at a coordinate re-hits that coordinate in
+--   the plugged tree — selecting the residual's coordinate in the
+--   plugged tree recovers the plugged node — and the plug
+--   CONTINUATION is stable: the residual re-taken at the re-hit
+--   coordinate plugs a second node to the tree the first residual
+--   plugs it to.  The residual can only come from 'focusForest', so its
+--   frames are consistent with its coordinate by construction.
+prop_ps_rehit :: Property
+prop_ps_rehit = conjoin
+  [ rehit (Selection [])     fP
+  , rehit (Selection [1])    fP
+  , rehit (Selection [0, 0]) fP
+  ]
+  where
+    -- The fresh node: a subtree, so the plug domain is not leaves only.
+    fresh :: Forest
+    fresh = Forest "z" (Alt "zz") [Forest "z1" (Alt "zz1") []]
+    -- The continuation's node: a second, different fresh node.
+    fresh2 :: Forest
+    fresh2 = Forest "y" (Alt "yy") []
+    rehit :: Selection -> Forest -> Property
+    rehit sel f = case focusForest sel f of
+      Nothing -> property False
+      Just ff ->
+        let res = focusResidual ff
+            t   = plugForest res fresh
+        in  case select (residualSel res) t of
+              Nothing -> property False
+              Just got ->
+                conjoin
+                  [ got === fresh
+                  , case refocused res t of
+                      Nothing   -> property False
+                      Just res2 -> plugForest res2 fresh2 === plugForest res fresh2
+                  ]
+    -- The residual re-taken at the re-hit coordinate.
+    refocused :: Residual -> Forest -> Maybe Residual
+    refocused res t = fmap focusResidual (focusForest (residualSel res) t)
+
+-- | A CYCLIC grammar terminates: the derivation re-enters a nonterminal
+--   at the SAME input position, so it makes no progress and fails — the
+--   deterministic parser reports absence and the enumerating parser
+--   reports no derivation.  Without the progress criterion this
+--   derivation never ends.
+prop_ps_cycle_terminates :: Property
+prop_ps_cycle_terminates = conjoin
+  [ parse gC ["x"] "a" === Nothing
+  , parseAll gC ["x"] "a" === []
+  , parseOne gC (ParseState [] ["x"]) "a" === Nothing
+  , parse gC ["x"] "b" === Nothing
+  , parseAll gC ["x"] "b" === []
+  ]
+  where
+    -- The cyclic grammar: "a" derives "b" and "b" derives "a", so every
+    -- derivation revisits a nonterminal at the position it started from.
+    gC :: Grammar
+    gC = [("a", [("toB", [NonTerm "b"])]), ("b", [("toA", [NonTerm "a"])])]
+
+-- | A PRODUCTIVE right-recursive grammar still parses: every cycle
+--   consumes a token, so the nonterminal is re-entered at a LATER
+--   position and the progress criterion never fires.  The SIBLING case
+--   is legal too: the same nonterminal twice in one production is a
+--   sibling expansion, not an ancestor, so it is not a cycle.
+prop_ps_recursive_grammar :: Property
+prop_ps_recursive_grammar = conjoin
+  [ parse gR ["x", "x"] "a"
+      === Just (Forest "a" (Alt "step")
+                  [ Forest "x" (Alt "x") []
+                  , Forest "a" (Alt "leaf") [Forest "x" (Alt "x") []]
+                  ], ["x", "x"])
+  , parseAll gR ["x", "x"] "a"
+      === [ Forest "a" (Alt "step")
+              [ Forest "x" (Alt "x") []
+              , Forest "a" (Alt "leaf") [Forest "x" (Alt "x") []]
+              ] ]
+  , parse gS [] "p"
+      === Just (Forest "p" (Alt "pair")
+                  [ Forest "n" (Alt "nil") []
+                  , Forest "n" (Alt "nil") []
+                  ], [])
+  ]
+  where
+    -- The right-recursive grammar: "a" is a token followed by "a" (the
+    -- cycle consumes a token each time), or a bare token.
+    gR :: Grammar
+    gR = [("a", [("step", [Term "x", NonTerm "a"]), ("leaf", [Term "x"])])]
+    -- The sibling grammar: "p" holds two "n"s (a nullable nonterminal),
+    -- so the second "n" is expanded at the same position as the first.
+    gS :: Grammar
+    gS = [("n", [("nil", [])]), ("p", [("pair", [NonTerm "n", NonTerm "n"])])]

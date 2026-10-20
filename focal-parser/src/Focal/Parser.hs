@@ -24,6 +24,15 @@
 --   (potentially ambiguous; possibly never exercised by an input) —
 --   and REPORTED, never resolved.
 --
+--   A DERIVATION TERMINATES BY A PROGRESS CRITERION, not by an
+--   acyclicity precondition: a step that re-enters the SAME nonterminal
+--   at the SAME input position has consumed nothing and makes no
+--   progress, so it fails — the deterministic family reports absence,
+--   the enumerating family reports no derivation.  A re-entry at a
+--   LATER position has consumed input and stays legal, so a productive
+--   right-recursive grammar parses as before and a cyclic grammar
+--   terminates with no result instead of diverging.
+--
 --   The FOREST focus extends the node focus: its residual is not a tree
 --   but a FRAME LIST (nearest-first) — each frame records one ancestor's
 --   kind and provenance plus the siblings left and right of the hole at
@@ -31,7 +40,10 @@
 --   in the residual independently of the frames, so the replacement laws
 --   are stated RELATIVE TO that coordinate: 'plugForest' rebuilds from
 --   the frames with the new node in the hole, and the coordinate
---   re-selects the replaced node.  A replacement also induces a
+--   re-selects the replaced node.  A residual can ONLY be obtained from
+--   'focusForest' (its constructor is not exported), so its frames are
+--   consistent with its coordinate BY CONSTRUCTION and the replacement
+--   laws hold over the WHOLE plug domain.  A replacement also induces a
 --   parse-set change — for the replaced node's kind, the grammar's
 --   alternatives minus the one the node's provenance claims — which
 --   'reparseReport' COMPUTES and REPORTS, never resolves: it also
@@ -116,7 +128,9 @@ module Focal.Parser
   , replaceAt
   , Frame(..)
   , FCtx(..)
-  , Residual(..)
+  , Residual
+  , residualCtx
+  , residualSel
   , ForestFocus(..)
   , focusForest
   , plugForest
@@ -160,6 +174,18 @@ instance Show ParseState where
     showParen (d > 10)
       (showString "ParseState " . shows c . showChar ' ' . shows r)
 
+-- | The input position of a parse state: the number of tokens consumed
+--   so far — the PROGRESS MEASURE of a derivation (a step that
+--   re-enters a nonterminal at the same position has made no progress).
+position :: ParseState -> Int
+position = length . consumed
+
+-- | The derivation path: the ANCESTOR expansions in progress, each a
+--   nonterminal kind with the input position it was expanded at.  A
+--   sibling's expansion is never on the path (only an ancestor's), so
+--   the same nonterminal may occur twice in one production.
+type Path = [(String, Int)]
+
 --------------------------------------------------------------------
 -- Parse forest with choice provenance
 --------------------------------------------------------------------
@@ -185,23 +211,45 @@ data Ambiguity = Ambiguous String [String]
 --   its name is recorded as the node's provenance (deterministic
 --   choice; the multi-derivation case is 'ambiguities'' business).
 --   'Nothing' when the kind is unknown or no alternative matches.
+--
+--   A kind already expanded at the SAME input position on the current
+--   derivation path makes no progress and is not expanded again: that
+--   derivation fails (absence), which is what keeps a cyclic grammar
+--   terminating.
 parseOne :: Grammar -> ParseState -> String -> Maybe (Forest, ParseState)
-parseOne g st kind = do
-  alts <- lookup kind g
-  firstAlt alts
+parseOne g st kind = parseOneAt g st kind []
+
+-- | 'parseOne' with the derivation path threaded: the path holds the
+--   ANCESTOR expansions (a nonterminal kind and the input position it
+--   was expanded at), never a sibling's.  Expanding a kind already on
+--   the path at the SAME position fails; the kind is pushed onto the
+--   path for the expansion of its own production.
+parseOneAt :: Grammar -> ParseState -> String -> Path -> Maybe (Forest, ParseState)
+parseOneAt g st kind path
+  | (kind, position st) `elem` path = Nothing
+  | otherwise = do
+      alts <- lookup kind g
+      firstAlt alts
   where
     firstAlt [] = Nothing
-    firstAlt ((name, syms) : as) = case deriveSeq g st syms of
+    firstAlt ((name, syms) : as) = case deriveSeqAt g st syms path' of
       Just (kids, st') -> Just (Forest kind (Alt name) kids, st')
       Nothing          -> firstAlt as
+    path' = (kind, position st) : path
 
 -- | Derive a symbol sequence: terminals consume their token; derived
 --   nonterminals recurse (depth-first, left to right).
 deriveSeq :: Grammar -> ParseState -> [Sym] -> Maybe ([Forest], ParseState)
-deriveSeq _  st []     = Just ([], st)
-deriveSeq g  st (s:ss) = case deriveSym g st s of
+deriveSeq g st syms = deriveSeqAt g st syms []
+
+-- | 'deriveSeq' with the derivation path threaded: the path is the
+--   ANCESTOR expansions of the sequence, so each sibling symbol is
+--   expanded with the same path (a sibling is not an ancestor).
+deriveSeqAt :: Grammar -> ParseState -> [Sym] -> Path -> Maybe ([Forest], ParseState)
+deriveSeqAt _  st []     _path = Just ([], st)
+deriveSeqAt g  st (s:ss) path = case deriveSymAt g st s path of
   Nothing         -> Nothing
-  Just (kid, st') -> case deriveSeq g st' ss of
+  Just (kid, st') -> case deriveSeqAt g st' ss path of
     Just (kids, st'') -> Just (kid : kids, st'')
     Nothing           -> Nothing
 
@@ -209,11 +257,18 @@ deriveSeq g  st (s:ss) = case deriveSym g st s of
 --   name (its forest node's kind IS the token, its provenance the
 --   same literal); a nonterminal recurses through 'parseOne'.
 deriveSym :: Grammar -> ParseState -> Sym -> Maybe (Forest, ParseState)
-deriveSym _  (ParseState _ [])     (Term _)  = Nothing
-deriveSym _  (ParseState c (t:ts)) (Term n)
+deriveSym g st sym = deriveSymAt g st sym []
+
+-- | 'deriveSym' with the derivation path threaded: a nonterminal
+--   already expanded at the SAME input position on the path fails (no
+--   progress); one expanded at a LATER position is legal (input was
+--   consumed).
+deriveSymAt :: Grammar -> ParseState -> Sym -> Path -> Maybe (Forest, ParseState)
+deriveSymAt _  (ParseState _ [])     (Term _)  _path = Nothing
+deriveSymAt _  (ParseState c (t:ts)) (Term n) _path
   | t == n    = Just (Forest t (Alt t) [], ParseState (c ++ [t]) ts)
   | otherwise = Nothing
-deriveSym g  st                    (NonTerm k) = parseOne g st k
+deriveSymAt g  st                    (NonTerm k) path = parseOneAt g st k path
 
 --------------------------------------------------------------------
 -- Top-level parse and the ambiguity report
@@ -221,7 +276,10 @@ deriveSym g  st                    (NonTerm k) = parseOne g st k
 
 -- | Parse a top-level kind: the whole input must be consumed.  The
 --   result is the forest and the consumed tokens (the parse's own
---   trace of the input, in order).
+--   trace of the input, in order).  A derivation that re-enters a
+--   nonterminal at the SAME input position makes no progress and fails,
+--   so a cyclic grammar yields no parse (absence) instead of
+--   diverging.
 parse :: Grammar -> [String] -> String -> Maybe (Forest, [String])
 parse g input kind = case parseOne g (ParseState [] input) kind of
   Just (f, st) | null (rest st) -> Just (f, consumed st)
@@ -292,28 +350,31 @@ replaceAt (Selection (i:is)) (Forest k a kids) new
 --   it consumes the WHOLE input — partial derivations are pruned at
 --   every alternative boundary).  The enumeration is exact for
 --   grammars whose nonterminals are non-nullable (no alternative
---   derives the empty token sequence) and acyclic (no recursion
---   without consuming a token); the zero-consumption prune is what
---   bounds the recursion — a nullable derivation is dropped rather
---   than looping, so 'parseAll' may return fewer results than 'parse'
---   admits in exactly that case.  Several alternatives may match the
+--   derives the empty token sequence); the zero-consumption prune is
+--   what bounds the enumeration — a nullable derivation is dropped
+--   rather than looping, so 'parseAll' may return fewer results than
+--   'parse' admits in exactly that case.  The recursion is bounded by
+--   the progress criterion as well: a derivation that re-enters a
+--   nonterminal at the SAME input position makes no progress and
+--   contributes no derivation, so a cyclic grammar enumerates nothing
+--   instead of diverging.  Several alternatives may match the
 --   same input, so a kind with more than one derivation yields one
 --   forest per derivation, in grammar order (enumerated, never
 --   silently resolved).
 parseAll :: Grammar -> [String] -> String -> [Forest]
-parseAll g input kind = go (ParseState [] input) kind
+parseAll g input kind = go (ParseState [] input) kind []
   where
     -- Pruned enumeration: a derivation is kept only when it consumed
     -- the WHOLE input from this state (the empty sequence trivially
     -- does); with zero-consumption pruning in 'deriveSymAll' the
     -- recursion terminates and a surviving root is a completed parse.
-    go st k = case lookup k g of
+    go st k path = case lookup k g of
       Nothing   -> []
-      Just alts -> concatMap (one st) alts
+      Just alts -> concatMap (one st path) alts
       where
-        one s (name, syms) =
+        one s p (name, syms) =
           [ Forest k (Alt name) kids
-          | (kids, st') <- deriveSeqAll g s syms
+          | (kids, st') <- deriveSeqAllAt g s syms ((k, position s) : p)
           , null (rest st')
           ]
 
@@ -322,32 +383,46 @@ parseAll g input kind = go (ParseState [] input) kind
 --   after the sequence (partial consumption is possible — a sequence
 --   may end mid-input; callers check total consumption).
 deriveSeqAll :: Grammar -> ParseState -> [Sym] -> [([Forest], ParseState)]
-deriveSeqAll _  st []     = [([], st)]
-deriveSeqAll g  st (s:ss) =
-  [ (kid : kids, st'') | (kid, st')  <- deriveSymAll g st s
-                       , (kids, st'') <- deriveSeqAll g st' ss ]
+deriveSeqAll g st syms = deriveSeqAllAt g st syms []
+
+-- | 'deriveSeqAll' with the derivation path threaded: the path is the
+--   ANCESTOR expansions of the sequence, so each sibling symbol is
+--   expanded with the same path (a sibling is not an ancestor).
+deriveSeqAllAt :: Grammar -> ParseState -> [Sym] -> Path -> [([Forest], ParseState)]
+deriveSeqAllAt _  st []     _path = [([], st)]
+deriveSeqAllAt g  st (s:ss) path =
+  [ (kid : kids, st'') | (kid, st')  <- deriveSymAllAt g st s path
+                       , (kids, st'') <- deriveSeqAllAt g st' ss path ]
 
 -- | The enumerating counterpart of 'deriveSym': every way to derive
 --   one symbol from the state (a terminal has at most one; a
 --   nonterminal has one per matching alternative).  ZERO-CONSUMPTION
 --   PRUNING: a nonterminal derivation that consumes no tokens is
 --   dropped — this is what bounds the enumeration (each surviving
---   step consumes strictly through the remaining tokens, so the
---   recursion terminates for acyclic grammars; a nullable derivation
---   is dropped, not looped, so the enumeration is exact exactly on the
---   non-nullable, acyclic fragment).
+--   step consumes strictly through the remaining tokens; a nullable
+--   derivation is dropped, not looped, so the enumeration is exact
+--   exactly on the non-nullable fragment).
 deriveSymAll :: Grammar -> ParseState -> Sym -> [(Forest, ParseState)]
-deriveSymAll _  (ParseState _ [])     (Term _)  = []
-deriveSymAll _  (ParseState c (t:ts)) (Term n)
+deriveSymAll g st sym = deriveSymAllAt g st sym []
+
+-- | 'deriveSymAll' with the derivation path threaded: a nonterminal
+--   already expanded at the SAME input position on the path has no
+--   derivations (no progress); one expanded at a LATER position is
+--   legal (input was consumed).
+deriveSymAllAt :: Grammar -> ParseState -> Sym -> Path -> [(Forest, ParseState)]
+deriveSymAllAt _  (ParseState _ [])     (Term _)  _path = []
+deriveSymAllAt _  (ParseState c (t:ts)) (Term n) _path
   | t == n    = [(Forest t (Alt t) [], ParseState (c ++ [t]) ts)]
   | otherwise = []
-deriveSymAll g  st                    (NonTerm k) =
-  [ (f, st') | (f, st') <- concatMap (one st) (altsOf k), grew st st' ]
+deriveSymAllAt g  st                    (NonTerm k) path
+  | (k, position st) `elem` path = []
+  | otherwise =
+    [ (f, st') | (f, st') <- concatMap (one st) (altsOf k), grew st st' ]
   where
     altsOf kind = maybe [] id (lookup kind g)
     one s (name, syms) =
       [ (Forest k (Alt name) kids, s')
-      | (kids, s') <- deriveSeqAll g s syms
+      | (kids, s') <- deriveSeqAllAt g s syms ((k, position s) : path)
       , grew s s'
       ]
     grew (ParseState c0 _) (ParseState c1 _) = length c1 > length c0
@@ -383,12 +458,22 @@ newtype FCtx = FCtx [Frame]
   deriving (Eq, Show)
 
 -- | The residual of a forest focus: the frame-list context and the
---   selection coordinate the focus was taken at.
-data Residual = Residual
-  { residualCtx :: FCtx
-  , residualSel :: Selection
-  }
+--   selection coordinate the focus was taken at.  A residual can ONLY
+--   be obtained from 'focusForest' (its constructor is not exported),
+--   so its frames are consistent with its coordinate BY CONSTRUCTION
+--   and the replacement laws hold over the WHOLE plug domain.
+--   'plugForest' ignores 'residualSel'.
+data Residual = Residual FCtx Selection
   deriving Eq
+
+-- | The residual's frame-list context.
+residualCtx :: Residual -> FCtx
+residualCtx (Residual c _) = c
+
+-- | The residual's selection coordinate — the coordinate the focus was
+--   taken at, which re-selects the plugged node.
+residualSel :: Residual -> Selection
+residualSel (Residual _ s) = s
 
 -- | 'Residual' takes two precedence 11 arguments.
 instance Show Residual where
@@ -432,7 +517,11 @@ focusForest sel root = do
 --   (siblings and provenance) with the new node in the hole.  Total:
 --   the frame list is ordered nearest-first, so folding it left
 --   rebuilds outward from the hole — the nearest frame wraps the new
---   node first and the root frame wraps last.
+--   node first and the root frame wraps last.  'plugForest' ignores
+--   'residualSel'; the residual can ONLY be obtained from
+--   'focusForest', so its frames are consistent with its coordinate by
+--   construction and the replacement laws hold over the whole plug
+--   domain.
 plugForest :: Residual -> Forest -> Forest
 plugForest (Residual (FCtx frames) _) new = foldl rebuild new frames
   where
