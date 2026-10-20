@@ -162,7 +162,9 @@ memoReads (Memo _ t) s = any (sameSomeFin s) (traceDeps t)
 
 -- | Invalidation: a memo is stale when a patch claims a variable the
 --   cached term reads (the patch would change a dependency).  The v1
---   check is positional over the claimed variables.
+--   check is positional over the claimed variables, and it is
+--   conservative: it may over-invalidate, but it never serves a stale
+--   'Clean' output.
 invalidatedBy :: Memo g t -> Patch g -> Bool
 invalidatedBy m p = anyClaimed (memoDeps m) (claimed p)
 
@@ -187,7 +189,9 @@ memoRead m@(Memo _ t) p
 
 -- | One invalidation-graph edge: a claimed variable and whether it
 --   reaches the memo (whether the memo reads it).  The v1 graph is a
---   star: one memo, one edge per claimed variable.
+--   star: one memo, one edge per claimed variable, provided the patch's
+--   claimed variables are distinct (repeated claims yield repeated
+--   edges).
 data InvalEdge (g :: [Ty]) where
   Edge :: SomeFin g -> Bool -> InvalEdge g
 
@@ -204,7 +208,9 @@ instance Show (Memo g t) where
       (showString "Memo " . showsPrec 11 p . showChar ' ' . showsPrec 11 t)
 
 -- | The invalidation graph of a memo under a patch: one edge per
---   claimed variable, marking which claims reach the memo.
+--   claimed variable, marking which claims reach the memo.  The edges
+--   are one per claim; the one-edge-per-variable reading assumes the
+--   patch's claimed variables are distinct.
 invalGraph :: Memo g t -> Patch g -> [InvalEdge g]
 invalGraph m p = map (\c -> Edge c (memoReads m c)) (claimed p)
 
@@ -239,6 +245,14 @@ recomputePatch p t = applyPatch p t
 --   invalidates the memo (it claims a variable the cached term reads)
 --   forces recomputation via the seam function (v1: 'recomputePatch');
 --   a clean patch reads through the cache.
+--
+--   Two premises bind the seam.  (A) On the recomputation branch the
+--   seam must be a correct patch-to-term function: the 'Recomputed'
+--   term is exactly what the seam returns.  (B) On the clean branch the
+--   cached term is returned without consulting the seam, so the seam
+--   must be a function of the cached term alone — a left action on it.
+--   A seam that would return something else for a clean patch is not
+--   observable through this plug.
 incrementalPlug :: (Patch g -> Rm g t -> Rm g t) -> Memo g t -> Patch g -> OutputDelta g t
 incrementalPlug recompute m@(Memo _ t) p
   | invalidatedBy m p = Recomputed (recompute p t) p

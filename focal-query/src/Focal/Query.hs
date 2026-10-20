@@ -251,7 +251,9 @@ data Putback
 -- | Put a view edit back under a policy: exactly one candidate applies;
 --   zero or several are reported as 'AmbiguousPutback' — every candidate
 --   in policy order, the empty list when the policy offers none.
---   Ambiguity is reported, never silently resolved.
+--   Ambiguity is reported, never silently resolved.  The policy's
+--   candidate list is the plug domain, and the verdicts are relative to
+--   that policy by construction.
 --
 --   >>> import Focal.Query
 --   >>> let t = Table ["id", "name"] [[("id", "1"), ("name", "a")]]
