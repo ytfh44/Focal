@@ -57,6 +57,10 @@ import Focal.Core (Focusing(..))
 --
 --   * GP: if @'split1' s == 'Just' (x, c)@ then @'plug1' c x == s@;
 --   * PG: @'split1' ('plug1' c x) == 'Just' (x, c)@.
+--
+--   'Ctx1' is a total type: for a shape with a second direct occurrence of
+--   the parameter the 'R1' branch is inhabited but not producible by
+--   'split1', so PG is stated on the image.
 class Derivative1 (f :: Type -> Type) where
   -- | One-hole context of the leftmost direct parameter occurrence.
   type Ctx1 f :: Type -> Type

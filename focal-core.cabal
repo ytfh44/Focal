@@ -40,7 +40,6 @@ library
       Focal.Generic
       Focal.Optional
   other-modules:
-      Lib
       Paths_focal_core
   autogen-modules:
       Paths_focal_core

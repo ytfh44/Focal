@@ -2,8 +2,8 @@
 --   @Either e@ return values instead of deferred errors.
 --
 --   Composition is ordered — 'splitE' runs outer to inner, 'plugE' inner to
---   outer, and the first 'Left' short-circuits. Laws carry success premises
---   (docs/foundation.md §3).
+--   outer, and the first 'Left' short-circuits. Laws carry the success
+--   premise **and** the residual premise @c ∈ R(f)@ (docs/foundation.md §3).
 module Focal.Partial
   ( FocusingE(..)
   , idE

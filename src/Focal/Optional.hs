@@ -8,9 +8,12 @@
 --
 --   * On the /hit domain/ @{s | splitO f s = Just _}@ the 'Focusing' laws hold
 --     clause-for-clause: **GP** — if @splitO f s = Just (a, c)@ then
---     @plugO f c a = s@; **PG** — if @plugO f c b = t@ then
---     @splitO f t = Just (b, c\')@; **PP** — under the same premise,
---     @plugO f c\' b2 = plugO f c b2@ for all @b2@.
+--     @plugO f c a = s@; **PG** — for every @c@ in the residual image of @f@
+--     (@c ∈ R(f)@), if @plugO f c b = t@ then @splitO f t = Just (b, c\')@,
+--     the /re-hit clause/ — re-splitting the plug output finds the plugged
+--     focus again; **PP** — for every @c@ in the residual image of @f@
+--     (@c ∈ R(f)@), under the same premise @plugO f c\' b2 = plugO f c b2@
+--     for all @b2@.
 --   * On a /miss/ (@splitO f s = Nothing@), @overO f h s == s@ for every @h@:
 --     the absence passes through unchanged.
 --   * 'composeO' short-circuits on the first miss, and residuals pair up as
@@ -18,9 +21,10 @@
 --
 --   Distinction from @Focal.Partial@. There, a failure is an error that
 --   travels in an @Either@ payload and the laws need explicit success
---   premises. Here, absence carries no payload and needs no premise: a miss
---   has a defined observable behaviour (pass-through), so the laws are total
---   as written above.
+--   premises. Here, absence carries no payload: on a miss the observable
+--   behaviour is fixed (@overO f h s = s@ for every @h@), while on a hit the
+--   clauses carry the residual premise @c ∈ R(f)@. A miss removes no residual
+--   premise.
 module Focal.Optional
   ( FocusingO(..)
   , idO

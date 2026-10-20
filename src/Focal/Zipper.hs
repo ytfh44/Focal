@@ -190,6 +190,10 @@ lcaPath _      _               = []
 --   tree the zipper was built from, and not a general split-plug lawful
 --   instance for other sources (docs/conformance.md). For the dynamic,
 --   input-sensitive counterpart see 'focusAt'.
+--
+--   An instance embedding it (@toOptional (fromZip z)@, or @composeO@/
+--   @composeF@ over it) inherits the registered PG-failing verdict — the
+--   input-invariance exemption is not lifted by composition.
 fromZip :: ZipTree t => Zip t -> Focusing [Frame t] t t t t
 fromZip z = Focusing
   { splitF = \_ -> (current z, context z)
@@ -205,6 +209,9 @@ fromZip z = Focusing
 --   domain — trees in which @path@ exists. Outside the domain (a later
 --   source lacking the path), @splitF@ raises a delayed 'error': 'Focusing'
 --   has no failure channel.
+--
+--   The residual premise is that residuals are frames obtained from the same
+--   tree at @path@; a hand-built context stack is outside it.
 focusAt :: ZipTree t => [Child t] -> t -> Maybe (Focusing [Frame t] t t t t)
 focusAt path t =
   case safeNavigate path t of

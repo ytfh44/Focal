@@ -1,6 +1,8 @@
 -- | List element focus. The residual is the left and right segments
 --   around the focused element, carrying positional geometry
---   (@length left == index@).
+--   (@length left == index@). @plugE@/@plugF@ accept residuals outside
+--   @R(f)@, and it is exactly those that the @L-PG@/@L-PP@ premise excludes,
+--   so the instance's law claims are stated on the image.
 --
 --   This is a direct instance of McBride's "dissection" of a container functor,
 --   where the one-hole context distinguishes elements to the left of the hole

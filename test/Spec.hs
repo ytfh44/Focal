@@ -55,13 +55,14 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
   , testGroup "L-OVF — overF homomorphism"
       [ testProperty "fstF: overF (g . h) = overF g . overF h" prop_lovf_fstF
       , testProperty "sndF: overF (g . h) = overF g . overF h" prop_lovf_sndF
+      , testProperty "userLens (fromLensLike): overF (g . h) = overF g . overF h" prop_lovf_userLens
       , testProperty "elementF: overF (g . h) = overF g . overF h" prop_lovf_list
       , testProperty "composed: overF (g . h) = overF g . overF h" prop_lovf_composed
       ]
   , testGroup "L-ASSOC — Composition associativity"
-      [ testProperty "idF chain: behavioural equivalence" prop_lassoc_idChain
-      , testProperty "tuple chain: mixed focus type" prop_lassoc_tupleChain
+      [ testProperty "tuple chain: mixed focus type" prop_lassoc_tupleChain
       , testProperty "list into tuple composition" prop_lassoc_listTupleChain
+      , testProperty "residual reassociation: flatten (left-nested) = right-nested" prop_lassoc_residual
       ]
   , testGroup "L-UNIT — Identity"
       [ testProperty "idF >>> fstF = fstF" prop_lunit_left_fst
@@ -90,6 +91,14 @@ tests = testGroup "Focal — Law & Contract Coverage (see docs/conformance.md)"
   , testGroup "Law discriminators — unlawful pureF pairs"
       [ testProperty "unlawful view: GP fails" prop_disc_pureF_gp
       , testProperty "unlawful set: PG fails" prop_disc_pureF_pg
+      ]
+  , testGroup "Law discriminators — residual-image premise"
+      [ testProperty "optional: an off-image residual is a miss, not a hit"
+          prop_discO_offImage
+      , testProperty "partial: an off-image residual re-splits to another focus"
+          prop_discE_offImage
+      , testProperty "effectful: the same shape through the Either lift"
+          prop_discM_offImage
       ]
   , testGroup "focusAt — dynamic zipper focus"
       [ testProperty "valid path extracts the child" prop_focusat_valid
@@ -544,22 +553,38 @@ prop_lovf_composed pair g h =
     in overF f (applyFun g . applyFun h) pair
          === overF f (applyFun g) (overF f (applyFun h) pair)
 
+-- | L-OVF for the embedded lens pair ('userLens', the lawful
+--   @fromLensLike@ instance used by the L-PG and L-PP witnesses): the
+--   update function composes through 'overF'.
+--
+--   The generated pair covers arbitrary updates; the fixed pair is
+--   non-constant, so the witness does not degenerate when the generated
+--   functions are.
+prop_lovf_userLens :: String -> String -> Fun String String -> Fun String String -> Property
+prop_lovf_userLens f0 l0 g h =
+  let u      = User f0 l0
+      g'     = applyFun g
+      h'     = applyFun h
+      fixedG x = reverse x ++ "!"
+      fixedH x = x ++ "#"
+  in conjoin
+       [ overF userLens (g' . h') u
+           === overF userLens g' (overF userLens h' u)
+       , overF userLens (fixedG . fixedH) u
+           === overF userLens fixedG (overF userLens fixedH u)
+       ]
+
 --------------------------------------------------------------------
 -- L-ASSOC — Composition associativity
 --------------------------------------------------------------------
 
-prop_lassoc_idChain :: Int -> Bool
-prop_lassoc_idChain s =
-  let left  = (idF >>> idF) >>> idF
-      right = idF >>> (idF >>> idF)
-  in overF left id s == overF right id s
-
 prop_lassoc_tupleChain :: (((Int, Int), String), Bool) -> Bool
 prop_lassoc_tupleChain v =
   let f = fstF
+      bump (x, y) = (x + 1, y * 2)
       left  = (idF >>> f) >>> fstF
       right = idF >>> (f >>> fstF)
-  in overF left id v == overF right id v
+  in overF left bump v == overF right bump v
 
 prop_lassoc_listTupleChain :: ([Int], String) -> Property
 prop_lassoc_listTupleChain pair =
@@ -568,7 +593,23 @@ prop_lassoc_listTupleChain pair =
         g = unsafeElementF 0
         left  = (f >>> g) >>> idF
         right = f >>> (g >>> idF)
-    overF left id pair === overF right id pair
+    overF left (+ 1) pair === overF right (+ 1) pair
+
+-- | The reassociation the definitional L-ASSOC/L-UNIT clauses name: the
+--   left-nested residual of a three-stage chain flattens to the
+--   right-nested one — the components are the same three residuals, so
+--   the two chains are the same decomposition, re-paired.  The chains
+--   themselves are one function, so the equality is definitional (see
+--   the L2 row of docs/foundation.md §3); this witness pins the pairing
+--   convention the reassociation identifies.
+prop_lassoc_residual :: ((Int, Bool), Char) -> Property
+prop_lassoc_residual s =
+  let f = fstF :: Focusing Char ((Int, Bool), Char) ((Int, Bool), Char) (Int, Bool) (Int, Bool)
+      g = fstF :: Focusing Bool (Int, Bool) (Int, Bool) Int Int
+      h = idF  :: Focusing () Int Int Int Int
+      left  = (f >>> g) >>> h
+      right = f >>> (g >>> h)
+  in flatten (snd (splitF left s)) === snd (splitF right s)
 
 --------------------------------------------------------------------
 -- L-UNIT — Identity
@@ -577,14 +618,14 @@ prop_lassoc_listTupleChain pair =
 prop_lunit_left_fst :: (Int, Int) -> Bool
 prop_lunit_left_fst pair =
   let f = fstF
-  in overF (idF >>> f) id pair == overF f id pair
+  in overF (idF >>> f) (+ 1) pair == overF f (+ 1) pair
 
 prop_lunit_left_list :: [Int] -> NonNegative Int -> Property
 prop_lunit_left_list xs (NonNegative n) =
   not (null xs) ==> do
     let i = n `mod` length xs
         f = unsafeElementF i
-    overF (idF >>> f) id xs === overF f id xs
+    overF (idF >>> f) (* 10) xs === overF f (* 10) xs
 
 prop_lunit_left_zipper :: Rose Int -> Property
 prop_lunit_left_zipper t@(Rose _ kids) =
@@ -593,19 +634,20 @@ prop_lunit_left_zipper t@(Rose _ kids) =
       Nothing -> property False
       Just z ->
         let f = fromZip z
-        in overF (idF >>> f) id t === overF f id t
+            bump (Rose x ks) = Rose (x + 1) ks
+        in overF (idF >>> f) bump t === overF f bump t
 
 prop_lunit_right_fst :: (Int, Int) -> Bool
 prop_lunit_right_fst pair =
   let f = fstF
-  in overF (f >>> idF) id pair == overF f id pair
+  in overF (f >>> idF) (+ 1) pair == overF f (+ 1) pair
 
 prop_lunit_right_list :: [Int] -> NonNegative Int -> Property
 prop_lunit_right_list xs (NonNegative n) =
   not (null xs) ==> do
     let i = n `mod` length xs
         f = unsafeElementF i
-    overF (f >>> idF) id xs === overF f id xs
+    overF (f >>> idF) (* 10) xs === overF f (* 10) xs
 
 prop_lunit_right_zipper :: Rose Int -> Property
 prop_lunit_right_zipper t@(Rose _ kids) =
@@ -614,7 +656,8 @@ prop_lunit_right_zipper t@(Rose _ kids) =
       Nothing -> property False
       Just z ->
         let f = fromZip z
-        in overF (f >>> idF) id t === overF f id t
+            bump (Rose x ks) = Rose (x + 1) ks
+        in overF (f >>> idF) bump t === overF f bump t
 
 --------------------------------------------------------------------
 -- Occurrence ≠ value — positional-encoding checks
@@ -756,6 +799,42 @@ prop_disc_pureF_pg =
   let u0 = User "alice" "smith"
       c = snd (splitF badSetLens u0)
   in fst (splitF badSetLens (plugF badSetLens c "bob")) /= "bob"
+
+--------------------------------------------------------------------
+-- Law discriminators — the residual-image premise
+--------------------------------------------------------------------
+
+-- | The optional rung: the empty list is not in @headO@'s residual image
+--   (@splitO@ reports a miss there), and an off-image residual filled
+--   into an optional focus is exactly that miss — observable
+--   pass-through, not a hit whose re-split would recover the plugged
+--   value.  So the premise @c ∈ R(f)@ is load-bearing on this rung too.
+prop_discO_offImage :: Property
+prop_discO_offImage = conjoin
+  [ splitO headO ([] :: [Int]) === Nothing
+  , overO headO (+ 1) [] === []
+  ]
+
+-- | The failure-channel rung: the residual @([1,2],[])@ describes index
+--   2, so plugging through it at @9@ succeeds — and the re-split of the
+--   result then reports index 0's element, not the plugged @9@.  The
+--   premise, not the type, is what excludes the case.
+prop_discE_offImage :: Property
+prop_discE_offImage = conjoin
+  [ plugE (elementE 0) ([1, 2], []) 9
+      === (Right [1, 2, 9] :: Either ListError [Int])
+  , fmap fst (splitE (elementE 0) [1, 2, 9])
+      === (Right 1 :: Either ListError Int)
+  ]
+
+-- | The same shape through the effectful lift: @toEffectfulE@ of the
+--   failure channel re-splits to index 0's element, so the effectful
+--   statement carries the residual premise as well.
+prop_discM_offImage :: Property
+prop_discM_offImage =
+  splitM (toEffectfulE (elementE 0)) [1, 2, 9]
+    === (Right (1, ([], [2, 9]))
+          :: Either ListError (Int, ([Int], [Int])))
 
 --------------------------------------------------------------------
 -- focusAt — dynamic zipper focus
@@ -1393,11 +1472,14 @@ prop_gen_split_plug t =
 prop_gen_rose_gp :: Rose Int -> Bool
 prop_gen_rose_gp t = overF roseGeneric id t == t
 
-prop_gen_rose_pg :: Rose Int -> Bool
-prop_gen_rose_pg t =
-  let (a, c)  = splitF roseGeneric t
-      (a', _) = splitF roseGeneric (plugF roseGeneric c a)
-  in a' == a
+-- | The re-hit clause of L-PG, exercised with a fresh replacement: the
+--   residual @c@ comes from the split, so it lies in the residual image, and
+--   plugging a replacement @b@ through it must re-split to exactly @b@.
+prop_gen_rose_pg :: Rose Int -> Int -> Bool
+prop_gen_rose_pg t b =
+  let (_a, c) = splitF roseGeneric t
+      (a', _) = splitF roseGeneric (plugF roseGeneric c b)
+  in a' == b
 
 prop_gen_rose_pp :: Rose Int -> Int -> Int -> Bool
 prop_gen_rose_pp t b1 b2 =
@@ -1426,6 +1508,9 @@ prop_opt_gp x xs =
     Just (a, c) -> plugO headO c a == x : xs
     Nothing     -> False
 
+-- | L-PG on the hit domain: @c@ comes from the split, so it is in the
+--   residual image — that is the law's premise (an off-image residual is
+--   pinned by 'prop_discO_offImage').
 prop_opt_pg :: Int -> [Int] -> Int -> Bool
 prop_opt_pg x xs y =
   case splitO headO (x : xs) of
@@ -1434,6 +1519,9 @@ prop_opt_pg x xs y =
       Nothing      -> False
     Nothing -> False
 
+-- | L-PP on the hit domain: both residuals (@c@ and the re-derived @c'@)
+--   come from the split, so the law is stated on the residual image — the
+--   premise, again (see 'prop_discO_offImage').
 prop_opt_pp :: Int -> [Int] -> Int -> Int -> Bool
 prop_opt_pp x xs b1 b2 =
   case splitO headO (x : xs) of
