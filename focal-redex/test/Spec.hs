@@ -11,7 +11,7 @@ import Test.Tasty.QuickCheck (testProperty, (===))
 import Focal.Optional (FocusingO(..))
 import Focal.Syntax (Ty(..), TyRep(..))
 import Focal.Redex
-  ( Decomp(..), EvalCtx(..), Fin(..), Redex(..), Rm(..), Value(..)
+  ( CBVRedex(..), Decomp(..), EvalCtx(..), Fin(..), Redex(..), Rm(..), Value(..)
   , decompose, plugEval, redexF, redexTerm, step, subst1, valueTerm
   )
 
@@ -32,15 +32,19 @@ tests = testGroup "focal-redex — canonical decomposition"
       , testProperty "step: redex in function slot" prop_rd_step_fun
       , testProperty "step: value does not step" prop_rd_step_value
       , testProperty "step chains: tArg -> tHead -> RUnit" prop_rd_step_chain
-      , testProperty "redexF split finds the head redex" prop_rd_redexF_split
-      , testProperty "redexF plug rebuilds the term" prop_rd_redexF_plug
-      , testProperty "redexF miss on a value" prop_rd_redexF_miss
+      , testProperty "redexF split finds the head CBV redex" prop_rd_redexF_split
+      , testProperty "redexF miss on a lambda" prop_rd_redexF_miss
       ]
   , testGroup "Redex laws"
       [ testProperty "plug-after-decompose over generated closed terms" prop_rd_plug
+      , testProperty "redexF: plug rebuilds the term from the split's focus"
+          prop_rd_redexF_plug
       , testProperty "step is defined exactly off the values" prop_rd_progress
       , testProperty "normalization reaches a value" prop_rd_norm
       , testProperty "head step = beta substitution" prop_rd_head
+      , testProperty "redexF: re-split after plug recovers the CBV redex" prop_rd_redexF_pg
+      , testProperty "redexF: the put-put equation holds over the plug domain"
+          prop_rd_redexF_pp
       ]
   ]
 
@@ -99,14 +103,84 @@ prop_rd_step_chain :: Property
 prop_rd_step_chain = (step tArg >>= step) === Just RUnit
 
 prop_rd_redexF_split :: Property
-prop_rd_redexF_split = splitO redexF tHead === Just (Beta TyRepU (RVar FZ) RUnit, EHole)
+prop_rd_redexF_split = splitO redexF tHead === Just (CBVBeta TyRepU (RVar FZ) VUnit, ())
 
+-- | L-GP for the redex rung: on the hit domain, plugging the focus
+--   back through the split's own residual rebuilds the term.
+--
+--   The witness covers the whole plug domain rather than one
+--   hand-picked term: the split ranges over generated closed terms at
+--   both focus sorts, @U@ and @U :-> U@, so the arrow-sorted focus
+--   ('CBVRedex' at @U :-> U@) is exercised as well.  A miss
+--   contributes nothing -- there is no focus to plug back, so the
+--   clause has no content there.
+--
+--   It can fail if the split reports a focus whose rebuild differs
+--   from the term it came from -- a sort error in the focus, or a
+--   redex body that the plug does not reproduce.
 prop_rd_redexF_plug :: Property
-prop_rd_redexF_plug = plugO redexF EHole (Beta TyRepU (RVar FZ) RUnit) === tHead
+prop_rd_redexF_plug = conjoin
+  [ forAll genU  gpAt
+  , forAll genArr gpAt
+  ]
+  where
+    gpAt t = case splitO redexF t of
+      Nothing     -> property True
+      Just (r, c) -> plugO redexF c r === t
 
 prop_rd_redexF_miss :: Property
 prop_rd_redexF_miss =
   splitO redexF (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U)) === Nothing
+
+-- | L-PG for the redex rung: the residual is the unit, so the premise
+--   @c ∈ R(redexF)@ is vacuous and the law is total.
+--
+--   The re-hit clause is witnessed over the whole plug domain: the
+--   split ranges over generated closed terms at both focus sorts,
+--   @U@ and @U :-> U@, so the arrow-sorted focus is re-hit as well and
+--   not only the unit-sorted one.  A miss contributes nothing -- there
+--   is no plug to re-split.
+--
+--   It can fail if the plug of a focus is not a term the split
+--   recognises: the re-split would then miss, or report a different
+--   focus than the one plugged.
+prop_rd_redexF_pg :: Property
+prop_rd_redexF_pg = conjoin
+  [ forAll genU  pgAt
+  , forAll genArr pgAt
+  ]
+  where
+    pgAt t = case splitO redexF t of
+      Nothing      -> property True
+      Just (r, ()) -> splitO redexF (plugO redexF () r) === Just (r, ())
+
+-- | A fresh replacement for the L-PP plug: a call-by-value redex
+--   whose body is the unit (the identity body @RVar FZ@ is the other
+--   shape).
+ppRepl :: CBVRedex '[] U
+ppRepl = CBVBeta TyRepU RUnit VUnit
+
+-- | L-PP for the redex rung: the put-put equation over the plug
+--   domain.
+--
+--   The residual is the unit -- the split's own image -- so the
+--   re-split residual @c'@ is the unit again and the equation
+--   degenerates to @plugO redexF () b2 == plugO redexF () b2@: it is
+--   satisfied by construction, not by the law's content.  What the
+--   witness does pin is the re-split premise the equation rests on: a
+--   plug of a fresh replacement is re-split to that replacement,
+--   together with the unit residual.
+prop_rd_redexF_pp :: Property
+prop_rd_redexF_pp = forAll genU $ \t ->
+  case splitO redexF t of
+    Nothing     -> property True
+    Just (r, c) ->
+      case splitO redexF (plugO redexF c ppRepl) of
+        Nothing       -> property False
+        Just (r', c') -> conjoin
+          [ r' === ppRepl
+          , plugO redexF c' r === plugO redexF c r
+          ]
 
 --------------------------------------------------------------------
 -- Generators — closed terms at two sorts, plus one- and two-variable

@@ -11,8 +11,10 @@
 --   'Rm' is the term language, indexed by its de Bruijn context ('Fin' are
 --   variables; 'RLam' extends the ambient context by its domain and keeps
 --   the domain representative needed to rebuild the binder).  'Value' is
---   the value GADT, 'Redex' the beta-redex, and 'EvalCtx' a call-by-value
---   evaluation context, indexed by the sorts of its hole and of its root:
+--   the value GADT, 'Redex' the beta-redex, 'CBVRedex' the call-by-value
+--   redex (a lambda applied to a 'Value', the focus of the optional rung),
+--   and 'EvalCtx' a call-by-value evaluation context, indexed by the sorts
+--   of its hole and of its root:
 --   the function position of 'EAppR' holds a 'Value', so the call-by-value
 --   invariant is carried by the type.  'contract' performs the beta
 --   contraction by single-variable substitution, 'decompose' (with 'step'
@@ -44,6 +46,8 @@ module Focal.Redex
   , valueTerm
   , Redex(..)
   , redexTerm
+  , CBVRedex(..)
+  , cbvRedexTerm
   , EvalCtx(..)
   , Decomp(..)
   , contract
@@ -93,6 +97,17 @@ data Redex (g :: [Ty]) (t :: Ty) where
 --   separately).
 redexTerm :: Redex g t -> Rm g t
 redexTerm (Beta r b a) = RApp (RLam r b) a
+
+-- | The call-by-value redex: a lambda applied to a 'Value'.  The
+--   call-by-value invariant is carried by the type -- the argument slot
+--   holds a 'Value', not an arbitrary term -- so every value of this type
+--   is producible by 'redexF''s split.
+data CBVRedex (g :: [Ty]) (t :: Ty) where
+  CBVBeta :: TyRep t -> Rm (t ': g) u -> Value g t -> CBVRedex g u
+
+-- | The call-by-value redex as a term.
+cbvRedexTerm :: CBVRedex g t -> Rm g t
+cbvRedexTerm (CBVBeta r b v) = RApp (RLam r b) (valueTerm v)
 
 -- | Call-by-value evaluation contexts: a hole of sort @s@ inside a term
 --   of sort @t@.
@@ -193,21 +208,30 @@ step t =
 --   that is itself a call-by-value redex (a lambda applied to a value),
 --   which is the case 'FocusingO' can express -- its focus sort is
 --   fixed, while 'decompose' reports the redex sort existentially and so
---   also reaches redexes below the root.  On the hit domain this
---   satisfies L-GP in the plug-after-decompose direction:
---   @plugO redexF e r = plugEval e (redexTerm r)@, and a miss -- a
---   value, or a term whose canonical redex lies deeper -- passes
---   through unchanged.
-redexF :: FocusingO (EvalCtx '[] t t) (Rm '[] t) (Rm '[] t) (Redex '[] t) (Redex '[] t)
+--   also reaches redexes below the root.  The focus type carries the
+--   call-by-value invariant ('CBVBeta' takes a 'Value') and the residual
+--   is the unit -- the split's own image -- so L-GP, L-PG and L-PP hold
+--   over the entire plug domain, with no residual-image premise and no
+--   value-ness premise.  A miss -- a value, or a term whose canonical
+--   redex lies deeper -- passes through unchanged.
+--
+--   >>> :set -XDataKinds -XTypeOperators
+--   >>> import Focal.Optional (FocusingO(..))
+--   >>> import Focal.Syntax
+--   >>> splitO redexF (RApp (RLam TyRepU (RVar FZ)) RUnit :: Rm '[] U)
+--   Just (CBVBeta TyRepU (RVar FZ) VUnit,())
+--   >>> splitO redexF (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
+--   Nothing
+redexF :: FocusingO () (Rm '[] t) (Rm '[] t) (CBVRedex '[] t) (CBVRedex '[] t)
 redexF = FocusingO
   { splitO = \t ->
       case t of
         RApp (RLam r b) a ->
           case decompose a of
-            IsValue va    -> Just (Beta r b (valueTerm va), EHole)
-            IsRedex _ _   -> Nothing
+            IsValue va  -> Just (CBVBeta r b va, ())
+            IsRedex _ _ -> Nothing
         _ -> Nothing
-  , plugO = \e r -> plugEval e (redexTerm r)
+  , plugO = \() r -> cbvRedexTerm r
   }
 
 -- | Apply a variable renaming to a term.
@@ -313,6 +337,22 @@ instance Show (Redex g t) where
   showsPrec d (Beta r b a) =
     showParen (d > 10) $
       showString "Beta " . showsPrec 11 r . showChar ' ' . showsPrec 11 b . showChar ' ' . showsPrec 11 a
+
+-- | Structural equality of call-by-value redexes, polymorphic in both
+--   compared contexts and sorts.
+eqCBVRedex :: CBVRedex g1 t1 -> CBVRedex g2 t2 -> Bool
+eqCBVRedex (CBVBeta r1 b1 v1) (CBVBeta r2 b2 v2) =
+  eqRep r1 r2 && eqRm b1 b2 && eqValue v1 v2
+
+instance Eq (CBVRedex g t) where
+  (==) = eqCBVRedex
+
+-- | 'CBVBeta' takes three precedence 11 arguments.
+instance Show (CBVRedex g t) where
+  showsPrec d (CBVBeta r b v) =
+    showParen (d > 10)
+      (showString "CBVBeta " . showsPrec 11 r . showChar ' ' . showsPrec 11 b
+        . showChar ' ' . showsPrec 11 v)
 
 -- | Structural equality of evaluation contexts, polymorphic in both
 --   compared contexts and sorts.

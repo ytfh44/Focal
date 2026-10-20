@@ -13,7 +13,7 @@
 --   the parse forest, the query putback, and the workflow gate.
 module Main (main) where
 
-import Test.QuickCheck (Property, property)
+import Test.QuickCheck (Property, conjoin, property)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.QuickCheck (testProperty, (===))
 
@@ -28,10 +28,11 @@ import Focal.Tuple (fstF)
 import Focal.Syntax (Tm(TApp, TLam, TUnit), Ty(..), TyRep(..), exApp, exConst)
 import Focal.Syntax.Stack (Stack(Hole, AppL), plugStack, splitStack)
 import Focal.Redex
-  ( EvalCtx, Fin(FZ, FS), Redex, Rm(RApp, RLam, RUnit, RVar), redexF, step )
+  ( CBVRedex, Fin(FZ, FS), Rm(RApp, RLam, RUnit, RVar), redexF, step )
 import Focal.Refactor (RCtx(RAppL, RHole), occursAt, plugRCtx, rename, substitute)
-import Focal.Delta (Delta(..), Edit(..), Patch(PNil), patchFocus)
-import Focal.Incremental (Memo(..), OutputDelta(Clean), memoRead, memoUpdate)
+import Focal.Delta
+  ( Delta(..), Edit(..), Patch(PNil, PCons), SomeEdit(..), patchDistinct, patchFocus )
+import Focal.Incremental (Memo(..), OutputDelta(Recomputed), memoRead, memoUpdate)
 import Focal.Form
   ( Field(..), FieldResidual(..), FormError(..), ModelSnapshot(..)
   , PutbackResult(..), WidgetPath(..), nonEmpty, putback
@@ -41,7 +42,7 @@ import Focal.Parser
   , plugForest, residualSel, select
   )
 import Focal.Query
-  ( JoinWitness(..), RelDelta(..), Table(..), ViewRow(..), relPutback, writeBack )
+  ( Projection(..), RelDelta(..), Table(..), View(..), project, relPutback, writeBack )
 import Focal.Workflow
   ( GateVerdict(..), Run(..), Transition(..), Workflow(..), validateGate )
 
@@ -53,26 +54,18 @@ tests = testGroup "Focal — cross-package consistency (frozen law-ids)"
   [ testGroup "L-GP"
       [ testProperty "syntax: plugStack (AppL Hole TUnit) exConst = exApp"
           prop_cs_lgp_syntax
-      , testProperty "refactor: plugRCtx (RAppL RUnit RHole) rebuilds the application"
-          prop_cs_lgp_refactor
       , testProperty "parser: plugForest restores the selected node"
           prop_cs_lgp_parser
-      , testProperty "delta: patchFocus on a live site is the global delta"
-          prop_cs_lgp_delta
       ]
   , testGroup "L-PG"
       [ testProperty "syntax: re-split after plug recovers focus and residual"
           prop_cs_pg_syntax
       , testProperty "parser: the residual's coordinate re-selects the replacement"
           prop_cs_pg_parser
-      , testProperty "refactor: substitution re-finds the occurrence at the replacement"
-          prop_cs_pg_refactor
       ]
   , testGroup "L-PP"
       [ testProperty "syntax: re-split after plug keeps a stable residual"
           prop_cs_pp_syntax
-      , testProperty "incremental: memoUpdate on a clean output is a read-through"
-          prop_cs_pp_incremental
       ]
   , testGroup "L-OVF"
       [ testProperty "optional: overO rebuilds the hit" prop_cs_lovf_hit
@@ -94,7 +87,8 @@ tests = testGroup "Focal — cross-package consistency (frozen law-ids)"
   , testGroup "Channels"
       [ testProperty "partial: elementE off the end reports PastEnd"
           prop_cs_ch_partial
-      , testProperty "optional: redexF misses a lambda" prop_cs_ch_optional
+      , testProperty "optional: a lambda is a miss, and a miss passes through"
+          prop_cs_ch_optional
       , testProperty "effectful: toEffectfulE agrees with overE"
           prop_cs_ch_effectful
       , testProperty "form: putback reports the empty email with its residual"
@@ -109,6 +103,14 @@ tests = testGroup "Focal — cross-package consistency (frozen law-ids)"
           prop_cs_rt_refactor
       , testProperty "redex: one call-by-value step contracts the head redex"
           prop_cs_rt_redex
+      , testProperty "refactor: plugRCtx (RAppL RUnit RHole) rebuilds the application"
+          prop_cs_lgp_refactor
+      , testProperty "delta: patchFocus on a live site is the global delta"
+          prop_cs_lgp_delta
+      , testProperty "refactor: substitution re-finds the occurrence at the replacement"
+          prop_cs_pg_refactor
+      , testProperty "incremental: memoUpdate re-keys the cell and the read returns it"
+          prop_cs_pp_incremental
       ]
   ]
 
@@ -172,12 +174,32 @@ wf0 = Workflow ["draft", "review", "done"]
   , Transition "approve" "review" "done"
   ]
 
--- | The one-row table the query witness puts back into.
-tbl0 :: Table
-tbl0 = Table ["id", "name"] [[("id", "1"), ("name", "a")]]
+-- | The two-row table the query witness puts back into; the witness
+--   edits the second row, whose provenance is the index 1.
+tblTwo :: Table
+tblTwo = Table ["id", "name"]
+  [ [("id", "1"), ("name", "a")]
+  , [("id", "2"), ("name", "b")]
+  ]
+
+-- | The memo cell before the update: it caches the identity term,
+--   which reads the innermost variable.
+preMemo :: Memo '[U] U
+preMemo = Memo PNil (RVar FZ)
+
+-- | The term the update writes into the cell: the unit, which differs
+--   from the term the cell held before the update.
+memoNewTerm :: Rm '[U] U
+memoNewTerm = RUnit
+
+-- | The patch the update is keyed by: an edit at the innermost
+--   variable — the one the pre-update term reads.
+memoUpdPatch :: Patch '[U]
+memoUpdPatch = PCons (SomeEdit (Edit (FZ :: Fin '[U] U) RUnit)) PNil
 
 --------------------------------------------------------------------
--- L-GP — split-plug reconstruction through four packages
+-- L-GP — split-plug reconstruction through the syntax and parser
+--   layers
 --------------------------------------------------------------------
 
 -- | Syntax: filling the split's residual with the focus rebuilds
@@ -185,13 +207,6 @@ tbl0 = Table ["id", "name"] [[("id", "1"), ("name", "a")]]
 prop_cs_lgp_syntax :: Property
 prop_cs_lgp_syntax =
   plugStack (AppL Hole TUnit) exConst === exApp
-
--- | Refactor: the context fill rebuilds the application.
-prop_cs_lgp_refactor :: Property
-prop_cs_lgp_refactor =
-  plugRCtx (RAppL RUnit RHole :: RCtx '[] '[] (U :-> U) U)
-    (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
-    === (RApp (RLam TyRepU (RVar FZ)) RUnit :: Rm '[] U)
 
 -- | Parser: the frame list rebuilds the forest with the selected node
 --   in its hole.
@@ -201,14 +216,8 @@ prop_cs_lgp_parser =
     (\ff -> plugForest (focusResidual ff) (focused ff) === forest0)
     (focusForest (Selection [1]) forest0)
 
--- | Delta: a live site's local replacement is the global delta.
-prop_cs_lgp_delta :: Property
-prop_cs_lgp_delta =
-  patchFocus (Edit (FZ :: Fin '[U] U) RUnit) (RVar FZ :: Rm '[U] U)
-    === Right (Delta (Edit (FZ :: Fin '[U] U) RUnit) RUnit)
-
 --------------------------------------------------------------------
--- L-PG — residual re-focus
+-- L-PG — residual re-focus through the syntax and parser layers
 --------------------------------------------------------------------
 
 -- | Syntax: re-splitting after the plug recovers the focus and the
@@ -226,15 +235,8 @@ prop_cs_pg_parser =
              === Just nodeZ)
     (focusForest (Selection [1]) forest0)
 
--- | Refactor: after substituting, the transported position occurs in
---   the image (the replacement is re-found there).
-prop_cs_pg_refactor :: Bool
-prop_cs_pg_refactor =
-  occursAt (FS FZ :: Fin '[U, U] U)
-    (substitute (FZ :: Fin '[U, U] U) (RVar (FS FZ)) (RVar FZ))
-
 --------------------------------------------------------------------
--- L-PP — residual-overwrite stability
+-- L-PP — residual-overwrite stability, witnessed on the syntax layer
 --------------------------------------------------------------------
 
 -- | Syntax: re-splitting after a plug yields a residual that behaves
@@ -244,13 +246,6 @@ prop_cs_pp_syntax =
   case splitStack (TyRepArr TyRepU TyRepU) (plugStack stackCtx firstRepl) of
     Nothing      -> property False
     Just (_, c') -> plugStack c' secondRepl === plugStack stackCtx secondRepl
-
--- | Incremental: a clean output leaves the memo untouched, so the
---   cached term reads through.
-prop_cs_pp_incremental :: Property
-prop_cs_pp_incremental =
-  memoRead (memoUpdate (Memo PNil (RVar FZ :: Rm '[U] U)) (Clean (RVar FZ :: Rm '[U] U))) PNil
-    === Just (RVar FZ :: Rm '[U] U)
 
 --------------------------------------------------------------------
 -- L-OVF — over composition
@@ -316,12 +311,17 @@ prop_cs_ch_partial =
   splitE (elementE 0) []
     === (Left (PastEnd 0) :: Either ListError (Int, ([Int], [Int])))
 
--- | Optional: a lambda is not a redex, so the redex focus misses.
+-- | Optional: a lambda is not a redex, so the redex focus misses; a miss
+--   passes the source through unchanged.
 prop_cs_ch_optional :: Property
 prop_cs_ch_optional =
-  (splitO redexF (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
-     :: Maybe (Redex '[] (U :-> U), EvalCtx '[] (U :-> U) (U :-> U)))
-    === Nothing
+  conjoin
+    [ (splitO redexF (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
+         :: Maybe (CBVRedex '[] (U :-> U), ()))
+        === Nothing
+    , overO redexF id (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
+        === RLam TyRepU (RVar FZ)
+    ]
 
 -- | Effectful: the embedding of the failure channel agrees with
 --   @overE@.
@@ -346,15 +346,19 @@ prop_cs_ch_workflow =
     === GateRejected 1 (Transition "bogus" "review" "done")
 
 --------------------------------------------------------------------
--- Domain round trips
+-- Domain round trips — one per-layer equation per instance
 --------------------------------------------------------------------
 
 -- | Query: the write-back policy lands the delta on the view row's
---   source.
+--   source.  The witness edits the SECOND row of the table, whose
+--   provenance is the non-zero index 1 — an implementation that
+--   hard-coded row index 0 is caught.
 prop_cs_rt_query :: Property
 prop_cs_rt_query =
-  relPutback writeBack tbl0 (ViewRow [("name", "a")] 0 (JoinWitness 0 Nothing)) "name" "z"
-    === Right (RelDelta 0 "name" "z")
+  case project (Projection ["name"]) tblTwo of
+    View (_ : vr : _) ->
+      relPutback writeBack tblTwo vr "name" "z" === Right (RelDelta 1 "name" "z")
+    View _ -> property False
 
 -- | Refactor: renaming twice with one pair is the identity.
 prop_cs_rt_refactor :: Property
@@ -368,3 +372,49 @@ prop_cs_rt_refactor =
 prop_cs_rt_redex :: Property
 prop_cs_rt_redex =
   step (RApp (RLam TyRepU (RVar FZ)) RUnit) === Just RUnit
+
+-- | Refactor: the context fill rebuilds the application — the
+--   refactor layer's own round-trip equation.
+prop_cs_lgp_refactor :: Property
+prop_cs_lgp_refactor =
+  plugRCtx (RAppL RUnit RHole :: RCtx '[] '[] (U :-> U) U)
+    (RLam TyRepU (RVar FZ) :: Rm '[] (U :-> U))
+    === (RApp (RLam TyRepU (RVar FZ)) RUnit :: Rm '[] U)
+
+-- | Delta: a live site's local replacement is the global delta — the
+--   patch layer's own round-trip equation.
+prop_cs_lgp_delta :: Property
+prop_cs_lgp_delta =
+  patchFocus (Edit (FZ :: Fin '[U] U) RUnit) (RVar FZ :: Rm '[U] U)
+    === Right (Delta (Edit (FZ :: Fin '[U] U) RUnit) RUnit)
+
+-- | Refactor: after substituting, the transported position occurs in
+--   the image (the replacement is re-found there) — the refactor
+--   layer's own round-trip equation.
+prop_cs_pg_refactor :: Bool
+prop_cs_pg_refactor =
+  occursAt (FS FZ :: Fin '[U, U] U)
+    (substitute (FZ :: Fin '[U, U] U) (RVar (FS FZ)) (RVar FZ))
+
+-- | Incremental: the layer's put-put content — the incremental
+--   layer's own round-trip equation.  A 'memoUpdate' that carries a
+--   recomputed term RE-KEYS the cell to the patch that produced it,
+--   and the cell the update wrote is what a later read returns.
+--
+--   The two values compared differ: the update writes the unit, while
+--   the cell held the identity term (@RVar FZ@) beforehand, and the
+--   update's patch claims the very variable that pre-update term
+--   reads — so the pre-update cell is stale under that patch and
+--   reads 'Nothing'.  An update that dropped the write, or that kept
+--   the pre-update cell, is therefore caught, and the re-key is
+--   observed through the key's claims rather than the term.
+prop_cs_pp_incremental :: Property
+prop_cs_pp_incremental = conjoin
+  [ -- the cell was re-keyed to the patch that produced the new term
+    case memoUpdate preMemo (Recomputed memoNewTerm memoUpdPatch) of
+      Memo key _ -> patchDistinct (FZ :: Fin '[U] U) key === False
+    -- the read after the update returns the cell the update wrote
+  , memoRead (memoUpdate preMemo (Recomputed memoNewTerm memoUpdPatch))
+      memoUpdPatch
+    === Just memoNewTerm
+  ]
