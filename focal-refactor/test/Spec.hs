@@ -26,6 +26,8 @@ tests = testGroup "focal-refactor — binder-aware replacement"
       , testProperty "occurrence and non-occurrence equations" prop_rf_substitute_hits
       , testProperty "no capture under a fresh binder" prop_rf_no_capture
       , testProperty "substitution commutes with the path" prop_rf_commute
+      , testProperty "the commutation premise is load-bearing"
+          prop_rf_commute_needsPremise
       ]
   , testGroup "Refactoring operations"
       [ testProperty "rename is an involution" prop_rf_rename_involution
@@ -59,11 +61,24 @@ prop_rf_no_capture = property $
       (RLam TyRepU (RApp (RLam TyRepU (RVar FZ)) (RVar (FS FZ))) :: Rm '[U, U] (U :-> U))
     === RLam TyRepU (RApp (RLam TyRepU (RVar FZ)) (RVar (FS (FS FZ))))
 
+-- | Substitution commutes with plugging along a refactor path, under the
+--   frame-occurrence premise: the path's frame terms must be free in the
+--   substituted variable.
+--
+--   The fourth shape carries a content-bearing frame — an application in
+--   the argument position whose function is a lambda over its own
+--   variable.  That frame is free in the substituted variable @FZ@ (the
+--   premise holds), and unlike the three trivial frames the left side
+--   substitutes into the frame term (under its binder) while the right
+--   side re-attaches it unchanged, so a broken 'substitute' /
+--   'weakenRm' / 'plugRCtx' shows up as a disagreement of the two sides.
 prop_rf_commute :: Property
 prop_rf_commute = conjoin
   [ forAll genBodyU1 (commuteAt (RHole :: RCtx '[U] '[U] U U))
   , forAll genArrU1 (commuteAt (RAppL RUnit RHole :: RCtx '[U] '[U] (U :-> U) U))
   , forAll genBodyU2 (commuteAt (RLamC TyRepU RHole :: RCtx '[U] '[U, U] U (U :-> U)))
+  , forAll genArrU1 (commuteAt (RAppL (RApp (RLam TyRepU (RVar FZ)) RUnit) RHole
+      :: RCtx '[U] '[U] (U :-> U) U))
   ]
   where
     commuteAt :: forall h s t. RCtx '[U] h s t -> Rm h s -> Property
@@ -73,6 +88,26 @@ prop_rf_commute = conjoin
       in  not (frameOccurs k (weakenFin k i))
             ==> substitute i a (plugRCtx k u)
                   === plugRCtx k (substitute (weakenFin k i) (weakenRm k a) u)
+
+-- | The commutation premise is load-bearing: @frameOccurs@ is a property of
+--   the path and the substituted variable alone, so the four shapes in
+--   'prop_rf_commute' satisfy it by construction — their frame terms are
+--   free in @FZ@.  This witness supplies the violating path (a frame term
+--   that is exactly the substituted variable's image) and shows the
+--   commutation failing there: the two substitution orders disagree, so
+--   the guard cannot be dropped.
+prop_rf_commute_needsPremise :: Property
+prop_rf_commute_needsPremise =
+  let k = RAppL (RVar FZ) RHole :: RCtx '[U] '[U] (U :-> U) U
+      i = FZ :: Fin '[U] U
+      a = RUnit :: Rm '[U] U
+      u = RLam TyRepU RUnit :: Rm '[U] (U :-> U)
+  in  conjoin
+        [ frameOccurs k (weakenFin k i) === True
+        , substitute i a (plugRCtx k u) === RApp (RLam TyRepU RUnit) RUnit
+        , plugRCtx k (substitute i a u) === RApp (RLam TyRepU RUnit) (RVar FZ)
+        , property (substitute i a (plugRCtx k u) /= plugRCtx k (substitute i a u))
+        ]
 
 --------------------------------------------------------------------
 -- Refactoring operations

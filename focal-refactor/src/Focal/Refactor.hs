@@ -111,7 +111,9 @@ plugRCtx (RAppR f k) x  = plugRCtx k (RApp f x)
 plugRCtx (RLamC rv k) b = plugRCtx k (RLam rv b)
 
 -- | Runtime witness of a de Bruijn context: the reps of every variable
---   in scope, outermost first.
+--   in scope, innermost first — the head of the list is the rep of the
+--   innermost variable ('FZ'), and each tail entry stands one variable
+--   further out.
 data TyCtx (g :: [Ty]) where
   TxCNil  :: TyCtx '[]
   TxCCons :: TyRep v -> TyCtx g -> TyCtx (v ': g)
@@ -317,6 +319,11 @@ weakenRm (RLamC _ k) u  = lift1 (weakenRm k u)
 -- | Does a hole-context variable occur in the path's frame terms (the
 --   @Rm@s carried by 'RAppL'/'RAppR' frames)?  'RHole' has no frames;
 --   a binder's own variable is not in the frames' scope.
+--
+--   The commutation lemma's premise is
+--   @not (frameOccurs k (weakenFin k i))@; callers check it with this
+--   function — 'plugRCtx' does not check it, so an unchecked call is
+--   outside the lemma's premise.
 frameOccurs :: RCtx g h s t -> Fin h s' -> Bool
 frameOccurs RHole _            = False
 frameOccurs (RAppL x k) i      = occursAt i x || frameOccurs k i

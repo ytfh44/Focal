@@ -161,7 +161,10 @@ instance Show (SomeEdit g) where
 --------------------------------------------------------------------
 
 -- | A patch: an ordered set of edits at distinct variables (distinctness
---   is the no-conflict invariant).
+--   is the no-conflict invariant).  'PCons' is the unchecked
+--   constructor; 'addEdit' is the checked form and refuses an edit at an
+--   already-claimed variable.  Every claim phrased "per claimed
+--   variable" is about patches that satisfy this distinctness invariant.
 data Patch (g :: [Ty]) where
   PNil  :: Patch g
   PCons :: SomeEdit g -> Patch g -> Patch g
@@ -181,25 +184,30 @@ patchDistinct i (PCons (SomeEdit (Edit j _)) rest) =
 
 -- | Extend a patch with an edit at a fresh variable; 'Nothing' when the
 --   variable is already claimed (the conflict: two candidate blocks for
---   one variable, no evidence to prefer either).
+--   one variable, no evidence to prefer either).  This is the checked
+--   form; 'PCons' is the unchecked constructor.
 addEdit :: Edit g s -> Patch g -> Maybe (Patch g)
 addEdit e@(Edit i _) p
   | patchDistinct i p = Just (PCons (SomeEdit e) p)
   | otherwise         = Nothing
 
 -- | Apply a patch: edits apply head-first, each at its own variable.
+--   The distinct-variable invariant is a precondition of this
+--   semantics.
 applyPatch :: Patch g -> Rm g t -> Rm g t
 applyPatch PNil                      = id
 applyPatch (PCons (SomeEdit e) rest) = applyPatch rest . applyEdit e
 
--- | The variables a patch claims, in order.
+-- | The variables a patch claims, in order.  For a patch that satisfies
+--   the distinct-variable invariant the claims are pairwise distinct.
 claimed :: Patch g -> [SomeFin g]
 claimed PNil                               = []
 claimed (PCons (SomeEdit (Edit i _)) rest) = SomeFin i : claimed rest
 
 -- | Which edits survive in a term: those whose variable still occurs at
 --   the moment the edit applies (a patch's own edits can consume each
---   other's targets).
+--   other's targets).  The distinct-variable invariant is a
+--   precondition.
 survivingPatch :: Patch g -> Rm g t -> [SomeFin g]
 survivingPatch PNil _ = []
 survivingPatch (PCons (SomeEdit e@(Edit i _)) rest) t
@@ -269,7 +277,9 @@ eqBlock _            _            = False
 
 -- | A structural delta: what the local replacement changed (the edit)
 --   plus what the term became (the global result).  The residual — the
---   unchanged remainder — is implicit in the result term.
+--   unchanged remainder — is implicit in the result term.  The stored
+--   term is provenance (rebuilt, not the identity of the delta), and
+--   the constructor is unchecked.
 data Delta (g :: [Ty]) (t :: Ty) where
   Delta :: Edit g s -> Rm g t -> Delta g t
 
@@ -336,7 +346,13 @@ renameEdit i j = Edit i (RVar j)
 
 -- | Rename through the patch focus: the global delta of the renaming
 --   when the renamed variable occurs, the zero-candidate conflict
---   otherwise.
+--   otherwise.  The delta's result term equals 'rename' @i j@ exactly
+--   when the renamed variable @i@ occurs in the term and the new name
+--   @j@ is fresh (does not occur in the renamed term): with @j@ fresh
+--   the one-point edit is the transposition, while without an
+--   occurrence of @i@ there is no site at all — the result is the
+--   conflict, although 'rename' would still rewrite the term.  (The
+--   edit-layer transposition is witnessed by @prop_dl_rename_swap@.)
 --
 --   >>> :set -XDataKinds -XTypeOperators
 --   >>> import Focal.Redex

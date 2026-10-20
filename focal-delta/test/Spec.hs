@@ -11,10 +11,11 @@ import Test.Tasty.QuickCheck (testProperty, (===))
 import Focal.Syntax (Ty(..), TyRep(..), eqRep)
 import Focal.Redex (Fin(..), Rm(..), Redex(..), contract, lift1)
 import Focal.Refactor
-  ( RCtx(..), occursAt, rename, substitute, weakenFin, weakenRm
+  ( RCtx(..), SomeFin(..), occursAt, rename, substitute, weakenFin, weakenRm
   )
 import Focal.Delta
-  ( Conflict(..), Delta(..), Edit(..), applyEdit, composeEdit, deltaOn
+  ( Conflict(..), Delta(..), Edit(..), Patch(..), SomeEdit(..), addEdit
+  , applyEdit, applyPatch, claimed, composeEdit, deltaOn
   , inlineApply, patchFocus, reindexDelta, renameEdit, samePos, survives
   )
 
@@ -34,6 +35,8 @@ tests = testGroup "focal-delta — structural patch focus"
           prop_dl_delta_on
       , testProperty "compose transports the second block (divergence boundary)"
           prop_dl_compose_divergence
+      , testProperty "addEdit refuses an edit at an already-claimed variable"
+          prop_dl_add_edit_refusal
       ]
   , testGroup "Refactoring bridge"
       [ testProperty "rename through the edit layer reproduces the operation (fresh target)"
@@ -132,6 +135,32 @@ prop_dl_compose_divergence =
         (RVar FZ :: Rm '[U, U] U)
         === RVar (FS FZ)
     ]
+
+-- | 'addEdit' is the checked form of extending a patch: it refuses an
+--   edit at a variable the patch already claims (the conflict — two
+--   candidate blocks for one variable, no evidence to prefer either) and
+--   accepts an edit at a fresh variable, extending the patch with it.
+prop_dl_add_edit_refusal :: Property
+prop_dl_add_edit_refusal =
+  case addEdit atFresh p of
+    Nothing -> property False
+    Just p'  -> conjoin
+      [ property (case addEdit atClaimed p of
+                   Nothing -> True
+                   Just _  -> False)
+      , case claimed p' of
+          [SomeFin jFresh, SomeFin jClaimed] ->
+            conjoin
+              [ property (samePos jFresh (FS FZ :: Fin '[U, U] U))
+              , property (samePos jClaimed (FZ :: Fin '[U, U] U))
+              ]
+          _ -> property False
+      , applyPatch p' (RVar (FS FZ) :: Rm '[U, U] U) === RUnit
+      ]
+  where
+    p         = PCons (SomeEdit (Edit (FZ :: Fin '[U, U] U) RUnit)) PNil
+    atClaimed = Edit (FZ :: Fin '[U, U] U) (RVar (FS FZ))
+    atFresh   = Edit (FS FZ :: Fin '[U, U] U) (RVar FZ)
 
 --------------------------------------------------------------------
 -- Refactoring bridge
