@@ -57,6 +57,7 @@ test-suite focal-syntax-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Negative
       Paths_focal_syntax
   autogen-modules:
       Paths_focal_syntax

@@ -3,12 +3,16 @@
 
 module Main (main) where
 
+import Control.Exception (SomeException, evaluate, try)
+import System.IO.Unsafe (unsafePerformIO)
+
 import Test.QuickCheck (Gen, Property, conjoin, forAll, oneof, property, sized)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.QuickCheck (testProperty, (===))
 
 import Focal.Syntax (Ty(..), Tm(..), TyRep(..), exApp, exConst)
 import Focal.Syntax.Stack (Stack(..), plugStack, splitStack)
+import Negative (bad)
 
 main :: IO ()
 main = defaultMain tests
@@ -24,6 +28,8 @@ tests = testGroup "focal-syntax — sort-indexed contexts"
       [ testProperty "hit => plugStack c a = t" prop_tm_gp
       , testProperty "splitStack ri (plugStack c b) = Just (b, c)" prop_tm_path
       , testProperty "plugStack c' b2 = plugStack c b2 on the residual image" prop_tm_pp
+      , testProperty "an ill-sorted replacement does not type-check" prop_neg_sortMismatch
+      , testProperty "off-image context: the plug re-splits to the whole term" prop_tm_offImage
       ]
   ]
 
@@ -122,3 +128,40 @@ prop_tm_pp = conjoin
         case splitStack ri (plugStack c b1) of
           Just (_, c') -> plugStack c' b2 === plugStack c b2
           Nothing      -> property False
+
+--------------------------------------------------------------------
+-- The negative witness and the off-image context
+--------------------------------------------------------------------
+
+-- | The ill-sorted replacement must not type-check.  'bad' lives in
+--   "Negative", which defers type errors, so forcing it raises the
+--   deferred error; the well-sorted control of the same shape and type
+--   forces cleanly and yields a term, so it is the sorts — not the
+--   harness — that make the difference.  The exception is caught as
+--   'SomeException' because a deferred type error raises a GHC-internal
+--   exception that @base@ does not name portably (it is not an
+--   'ErrorCall'); the control is what keeps the witness discriminating.
+prop_neg_sortMismatch :: Property
+prop_neg_sortMismatch = unsafePerformIO $ do
+  badR  <- try (evaluate (bad  :: Tm U)) :: IO (Either SomeException (Tm U))
+  goodR <- try (evaluate (good :: Tm U)) :: IO (Either SomeException (Tm U))
+  pure (property (either (const True) (const False) badR
+                && either (const False) (const True) goodR))
+{-# NOINLINE prop_neg_sortMismatch #-}
+
+-- | The well-sorted control: the same hole and shape, with a replacement
+--   of the hole's sort.
+good :: Tm U
+good = plugStack (Hole :: Stack U U) TUnit
+
+-- | The off-image context of the typed stack: a frame term that already
+--   carries the target sort.  @plugStack@ accepts it, while
+--   @splitStack@ never produces it — the plug rebuilds the whole term,
+--   and the re-split of that term reports the whole term as the focus,
+--   not the plugged one.  So the @L-PG@/@L-PP@ premise is load-bearing
+--   here and cannot be dropped.
+prop_tm_offImage :: Property
+prop_tm_offImage = conjoin
+  [ plugStack (AppL (LamS TyRepU Hole) TUnit) TUnit === exApp
+  , fmap fst (splitStack TyRepU exApp) === Just exApp
+  ]

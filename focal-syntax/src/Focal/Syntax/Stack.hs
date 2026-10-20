@@ -70,6 +70,13 @@ splitStack ri t =
 
 -- | The sort-indexed optional-focus rung: decomposition finds the canonical
 --   occurrence or reports absence (no failure channel needed).
+--
+--   A 'Stack' value outside 'splitStack''s image — a function-position frame
+--   ('AppR') containing an occurrence of the sort, or a non-'Hole' context
+--   whose root already has that sort — is outside the @L-PG@/@L-PP@ premise.
+--   An argument-position frame ('AppL') is never inspected by 'splitStack',
+--   so a context whose argument frame carries an occurrence is still in the
+--   image; canonicality of the residual is not expressible in the type.
 stackO :: TyRep i -> FocusingO (Stack i j) (Tm j) (Tm j) (Tm i) (Tm i)
 stackO ri = FocusingO { splitO = splitStack ri, plugO = plugStack }
 
